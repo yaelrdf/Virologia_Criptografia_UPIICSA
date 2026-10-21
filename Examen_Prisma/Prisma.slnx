@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Prisma.Api/Prisma.Api.csproj" />
+    <Project Path="src/Prisma.Core/Prisma.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Prisma.Core.Tests/Prisma.Core.Tests.csproj" />
+  </Folder>
+</Solution>
