@@ -83,7 +83,7 @@ public static class PrismaStego
             trace.PayloadBytes = len;
             trace.CapacityBytes = Capacity(ch.Length);
         }
-        return PrismaCipher.Decrypt(c, k)[..len];
+        return PrismaCipher.Decrypt(c, k, trace)[..len];
     }
 
     public static int Bit(byte[] data, int i) => (data[i >> 3] >> (7 - (i & 7))) & 1;   // MSB primero
