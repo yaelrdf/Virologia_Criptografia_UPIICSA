@@ -122,7 +122,16 @@ public class CaesarTests
     public void RoundTripPreservesCaseAndSymbols(bool enye)
     {
         const string t = "Mañana, a las 18:00, ¡en la Biblioteca!";
-        Assert.Equal(t, Caesar.Decrypt(Caesar.Encrypt(t, 11, enye), 11, enye));
+        Assert.Equal(Caesar.Normalize(t, enye), Caesar.Decrypt(Caesar.Encrypt(t, 11, enye), 11, enye));
+    }
+
+    [Fact]
+    public void AccentsDoNotLeak()
+    {
+        Assert.Equal("Informacion cuanto", Caesar.Normalize("Información cuánto", false));
+        Assert.Equal("Mañana", Caesar.Normalize("Mañana", true));
+        Assert.Equal("Manana", Caesar.Normalize("Mañana", false));
+        Assert.DoesNotContain('ó', Caesar.Encrypt("Información", 3));
     }
 
     [Theory]

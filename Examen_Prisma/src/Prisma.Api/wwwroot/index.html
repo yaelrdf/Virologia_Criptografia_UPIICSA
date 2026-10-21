@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>PRISMA-L</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 29 27H3z' fill='%236d5dfc'/%3E%3Cpath d='M16 3 22 27H10z' fill='%2333c3a5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/ocultar" aria-label="PRISMA-L inicio">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 29 27H3z" fill="var(--accent)"/><path d="M16 3 22 27H10z" fill="var(--accent-2)"/></svg>
+      <span>PRISMA-L</span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menú" aria-expanded="false">☰</button>
+    <nav id="nav" class="nav" hidden>
+      <a href="#/ocultar">Ocultar</a>
+      <a href="#/revelar">Revelar</a>
+      <a href="#/cesar">César</a>
+      <a href="#/comparador">Comparador</a>
+      <a href="#/cuenta">Cuenta</a>
+      <a href="#/admin" data-admin hidden>Admin</a>
+      <button class="link" id="logoutBtn">Salir</button>
+    </nav>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer class="footer">Virología y Criptografía · UPIICSA–IPN · César + LSB + PRISMA-L</footer>
+  <script src="app.js"></script>
+</body>
+</html>
