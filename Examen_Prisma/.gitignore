@@ -1,0 +1,27 @@
+# Datos locales del servidor
+*.db
+*.db-shm
+*.db-wal
+src/Prisma.Api/data/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/.kotlin/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Firma del APK (nunca al repositorio)
+android/keystore/
+android/keystore.properties
+*.jks
+*.keystore
+
+# Python
+__pycache__/
+.venv/
