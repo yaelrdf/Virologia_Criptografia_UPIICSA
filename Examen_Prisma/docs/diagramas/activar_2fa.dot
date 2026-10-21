@@ -1,0 +1,9 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio (sesión iniciada)", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; no [label="401: contraseña incorrecta", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Contraseña + imagen\n(catálogo o propia)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; q [label="¿Contraseña correcta?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
+  tok [label="T = 32 bytes aleatorios (CSPRNG)"]; hide [label="llave.png = OcultarPRISMA(imagen, T, frase = contraseña)"];
+  save [label="Guardar SHA-256(T) y TwoFactorEnabled = true\n(el token nunca se guarda)"]; out [label="Descargar llave.png", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> q; q -> no [label="no"]; q -> tok [label="sí"]; tok -> hide -> save -> out -> fin;
+}

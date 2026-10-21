@@ -1,0 +1,10 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Imagen portadora, mensaje M", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; rgb [label="Normalizar a RGB de 8 bits\n(canales R,G,B en orden)"];
+  tr [label="Trama = longitud(4 B) ‖ M\n→ cadena de bits"]; q [label="¿bits ≤ canales?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; err [label="Error: no cabe", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  j0 [label="j = 0"]; set [label="canal[j] = (canal[j] AND 11111110) OR bit[j]"]; inc [label="j = j + 1"];
+  q2 [label="¿quedan bits?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; png [label="Guardar como PNG (sin pérdida)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> rgb -> tr -> q; q -> err [label="no"]; q -> j0 [label="sí"]; j0 -> set -> inc -> q2; q2 -> set [label="sí"]; q2 -> png [label="no"]; png -> fin;
+}

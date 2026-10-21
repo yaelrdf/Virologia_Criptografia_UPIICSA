@@ -1,0 +1,10 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Texto cifrado C", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; k0 [label="k = 0"];
+  dec [label="P_k = Descifrar(C, k)"]; cnt [label="Contar Oᵢ: apariciones de cada letra en P_k"];
+  chi [label="χ²(k) = Σ (Oᵢ − Eᵢ)² / Eᵢ\nEᵢ = N · frecuencia del español"]; inc [label="k = k + 1"];
+  q [label="¿k < n?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; ord [label="Ordenar claves por χ² ascendente"]; out [label="Clave con menor χ²\ny texto recuperado", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> k0 -> dec -> cnt -> chi -> inc -> q; q -> dec [label="sí"]; q -> ord [label="no"]; ord -> out -> fin;
+}
