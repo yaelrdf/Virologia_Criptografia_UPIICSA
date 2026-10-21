@@ -30,7 +30,13 @@ async function busy(button, fn) {
   const label = button.innerHTML;
   button.disabled = true;
   button.innerHTML = `<span class="spinner" aria-hidden="true"></span> Procesando…`;
-  try { return await fn(); } finally { button.disabled = false; button.innerHTML = label; }
+  try { return await fn(); }
+  finally {
+    button.disabled = false;
+    // Una vista puede pedir otra etiqueta para el siguiente paso (p. ej., el login con 2FA).
+    button.innerHTML = button.dataset.nextLabel ?? label;
+    delete button.dataset.nextLabel;
+  }
 }
 
 class ApiError extends Error {
@@ -163,7 +169,7 @@ views.login = () => {
             needs2fa = true;
             $("#step2").hidden = false;
             $("#u").readOnly = true;
-            $("#go").textContent = "Verificar imagen-llave";
+            $("#go").dataset.nextLabel = "Verificar imagen-llave";
             $("#k").focus();
             toast("Contraseña correcta. Ahora carga tu imagen-llave.");
             return;
@@ -347,14 +353,15 @@ views.cesar = () => {
       try {
         if (op === "crack") {
           const r = await api("/api/caesar/crack", { method: "POST", json: { text, enye } });
-          const max = Math.max(...r.candidates.map((c) => c.chiSquare).filter(Number.isFinite));
+          // Barra = χ²(mejor) / χ²(k): la clave correcta llena la barra y las demás quedan casi vacías.
+          const best = Math.max(r.best.chiSquare, 0.01);
           $("#out").innerHTML = `
             <h2>Clave encontrada: k = ${r.best.key} <span class="badge ok">${fmt(r.ms)} ms</span></h2>
             <div class="message-box">${esc(r.best.preview)}</div>
             <h3>Las ${r.candidates.length} claves ordenadas por χ² (menor = más parecido al español)</h3>
             <div class="table-wrap"><table><thead><tr><th>k</th><th>χ²</th><th></th><th>Vista previa</th></tr></thead><tbody>
             ${r.candidates.map((c, i) => `<tr class="${i === 0 ? "best" : ""}"><td class="num">${c.key}</td><td class="num">${fmt(c.chiSquare)}</td>
-              <td><div class="bar"><i style="width:${Math.max(2, 100 - (100 * c.chiSquare) / max)}%"></i></div></td><td>${esc(c.preview.slice(0, 48))}</td></tr>`).join("")}
+              <td><div class="bar"><i style="width:${Math.max(2, Math.min(100, (100 * best) / Math.max(c.chiSquare, 0.01)))}%"></i></div></td><td>${esc(c.preview.slice(0, 48))}</td></tr>`).join("")}
             </tbody></table></div>`;
         } else {
           const r = await api(`/api/caesar/${op}`, { method: "POST", json: { text, key: +k.value, enye } });
@@ -450,6 +457,8 @@ views.cuenta = async () => {
           const blob = await res.blob(), name = filenameFrom(res, "llave.png");
           download(blob, name);
           updateSession({ twoFactorEnabled: true });
+          const badge = $("#me .badge.no");
+          if (badge) { badge.className = "badge ok"; badge.textContent = "activado"; }
           $("#on").remove();
           $("#key").innerHTML = `
             <div class="message-box">2FA activado. Se descargó <b>${esc(name)}</b>. Guárdala en un lugar seguro: la necesitarás cada vez que inicies sesión.</div>

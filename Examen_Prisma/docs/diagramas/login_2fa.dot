@@ -1,0 +1,12 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; ok [label="Sesión iniciada (JWT)", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; no [label="401: credenciales\no imagen-llave inválidas", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Usuario y contraseña", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; pw [label="Verificar PBKDF2(contraseña, sal)\ncontra el hash guardado"];
+  q1 [label="¿Contraseña\ncorrecta?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; q2 [label="¿Tiene 2FA\nactivado?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
+  req [label="Responder requires2fa = true"]; img [label="Usuario + contraseña + llave.png", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  rev [label="T' = RevelarPRISMA(llave.png, contraseña)"]; q3 [label="¿Se pudo revelar?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
+  cmp [label="¿SHA-256(T') = hash guardado?\n(tiempo constante)", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
+  ini -> ent -> pw -> q1; q1 -> no [label="no"]; q1 -> q2 [label="sí"]; q2 -> ok [label="no"]; q2 -> req [label="sí"]; req -> img -> rev -> q3;
+  q3 -> no [label="no"]; q3 -> cmp [label="sí"]; cmp -> ok [label="sí"]; cmp -> no [label="no"];
+}

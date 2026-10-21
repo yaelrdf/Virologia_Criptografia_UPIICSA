@@ -1,0 +1,9 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Cifrado C, claves", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; init [label="prev = C₀;  s = s₀"]; blk [label="Tomar el siguiente bloque Cᵢ"];
+  s [label="s = (a·s + c) mod 256"]; y [label="Y = (Cᵢ − s) mod 256"]; x [label="X = A⁻¹·Y mod 256"]; p [label="Pᵢ = X ⊕ prev;  prev = Cᵢ"];
+  q [label="¿Quedan bloques?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; out [label="Mensaje P (se recorta a la longitud real)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> init -> blk -> s -> y -> x -> p -> q; q -> blk [label="sí"]; q -> out [label="no"]; out -> fin;
+}

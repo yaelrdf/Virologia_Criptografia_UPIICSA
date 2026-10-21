@@ -1,0 +1,12 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Frase, sal (16 B)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  k [label="K = PBKDF2-HMAC-SHA256(frase, sal, 100 000 it., 32 B)"]; c0 [label="ctr = 0"];
+  h [label="h = SHA-256(K ‖ \"hill\" ‖ ctr)\nA = [[h₀, h₁], [h₂, h₃]]"]; q [label="¿det(A) impar?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; inc [label="ctr = ctr + 1"];
+  inv [label="A⁻¹ = det(A)⁻¹ · adj(A) mod 256\n(det⁻¹ por Euclides extendido)"];
+  lcg [label="s₀ = K[4]\na = 4·(K[5] mod 63 + 1) + 1   (a ≡ 1 mod 4)\nc = 2·(K[6] mod 128) + 1   (c impar)"];
+  rest [label="C₀ = (K[7], K[8])\nsemilla = K[16..23]\nk_mac = SHA-256(K ‖ \"mac\")"]; out [label="A, A⁻¹, s₀, a, c, C₀, semilla, k_mac", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> k -> c0 -> h -> q; q -> inc [label="no"]; inc -> h; q -> inv [label="sí"]; inv -> lcg -> rest -> out -> fin;
+}

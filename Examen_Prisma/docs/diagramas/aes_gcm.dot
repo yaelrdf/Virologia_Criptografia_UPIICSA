@@ -1,0 +1,8 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Mensaje, frase", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; sal [label="sal (16 B) y nonce (12 B) aleatorios"]; key [label="clave = PBKDF2(frase, sal, 100 000 it., 32 B)"];
+  enc [label="AES-256 en modo GCM:\nC = M ⊕ AES_k(contador) ;  etiqueta = GHASH en GF(2¹²⁸)"]; out [label="sal ‖ nonce ‖ C ‖ etiqueta(16)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> sal -> key -> enc -> out -> fin;
+}
