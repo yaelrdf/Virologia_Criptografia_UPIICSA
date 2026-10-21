@@ -145,6 +145,37 @@ else
     Line("Lectura: el LSB clásico escribe al inicio de la imagen, así que el ataque χ² sobre el 10 % inicial lo detecta en cuanto el mensaje llena esa zona. PRISMA-L reparte los bits por toda la imagen: con mensajes pequeños, ninguna región queda saturada. Con ocupación alta, cualquier LSB por reemplazo se vuelve detectable.");
     Line();
 
+    // Robustez: alteración y recompresión
+    Line("## 4b. Integridad y robustez (escenarios E3 y E6)");
+    var secret = Encoding.UTF8.GetBytes("Hola Bob, nos vemos a las 18:00");
+    var stego = PrismaStego.Embed(cover, secret, "girasol-azul-42");
+    string Try(RgbImage img, string pass)
+    {
+        try { return "se revela: «" + Encoding.UTF8.GetString(PrismaStego.Reveal(img, pass)) + "»"; }
+        catch (StegoException) { return "error genérico (rechazado)"; }
+    }
+    var salt = PrismaStego.ReadBits(stego.Channels, i => i, PrismaStego.SaltBytes);
+    var path = FisherYates.Path(stego.Channels.Length, PrismaKeys.Derive("girasol-azul-42", salt).Seed);
+    var inPath = stego.Clone(); inPath.Channels[path[200]] ^= 1;
+    var outside = stego.Clone(); outside.Channels[path[^1]] ^= 1;
+    var saltHit = stego.Clone(); saltHit.Channels[5] ^= 1;
+    using var skBmp = SkiaSharp.SKBitmap.Decode(ImageIO.EncodePng(stego));
+    var jpeg90 = ImageIO.Decode(skBmp.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 90).ToArray());
+    var jpeg100 = ImageIO.Decode(skBmp.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 100).ToArray());
+    int changed = jpeg90.Channels.Zip(stego.Channels, (a, b) => (a & 1) != (b & 1) ? 1 : 0).Sum();
+    Line("Mensaje de 31 B oculto con PRISMA-L en `montanas.png`.");
+    Line();
+    Line("| Caso | Resultado |");
+    Line("|---|---|");
+    Line($"| Imagen intacta, frase correcta | {Try(stego, "girasol-azul-42")} |");
+    Line($"| Imagen intacta, frase incorrecta | {Try(stego, "girasol-rojo-42")} |");
+    Line($"| 1 bit alterado **dentro** de la trama (posición 200 del recorrido) | {Try(inPath, "girasol-azul-42")} |");
+    Line($"| 1 bit alterado en un canal que la trama **no usa** | {Try(outside, "girasol-azul-42")} |");
+    Line($"| 1 bit alterado en la sal (canales 0..127) | {Try(saltHit, "girasol-azul-42")} |");
+    Line($"| Recomprimida como JPEG calidad 90 (\"enviar como foto\") | {Try(jpeg90, "girasol-azul-42")}; cambiaron {changed:N0} de {stego.Channels.Length:N0} LSB ({100.0 * changed / stego.Channels.Length:F1} %) |");
+    Line($"| Recomprimida como JPEG calidad 100 | {Try(jpeg100, "girasol-azul-42")} |");
+    Line();
+
     // 6. Tiempos
     Line("## 5. Tiempos (promedio de 5 ejecuciones)");
     double Time(Action a) { a(); var sw = Stopwatch.StartNew(); for (int i = 0; i < 5; i++) a(); return sw.Elapsed.TotalMilliseconds / 5; }
