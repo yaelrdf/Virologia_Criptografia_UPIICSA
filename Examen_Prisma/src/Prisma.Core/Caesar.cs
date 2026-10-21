@@ -10,8 +10,25 @@ public static class Caesar
 
     public static string AlphabetFor(bool withEnye) => withEnye ? Spanish : Latin;
 
-    public static string Encrypt(string text, int key, bool withEnye = false) => Shift(text, key, AlphabetFor(withEnye));
-    public static string Decrypt(string text, int key, bool withEnye = false) => Shift(text, -key, AlphabetFor(withEnye));
+    public static string Encrypt(string text, int key, bool withEnye = false) => Shift(Normalize(text, withEnye), key, AlphabetFor(withEnye));
+    public static string Decrypt(string text, int key, bool withEnye = false) => Shift(Normalize(text, withEnye), -key, AlphabetFor(withEnye));
+
+    /// <summary>
+    /// Quita tildes y diéresis (á → a, ü → u) para que todas las letras pasen por el alfabeto, como en el
+    /// material base ("el ejemplo omite tildes"). La Ñ se conserva solo si el alfabeto la incluye; si no, pasa a N.
+    /// </summary>
+    public static string Normalize(string text, bool withEnye)
+    {
+        var sb = new StringBuilder(text.Length);
+        foreach (char ch in text)
+        {
+            if (withEnye && ch is 'ñ' or 'Ñ') { sb.Append(ch); continue; }
+            string d = ch.ToString().Normalize(NormalizationForm.FormD);
+            char b = d[0];
+            sb.Append(d.Length > 1 && char.IsLetter(b) && b < 128 ? b : ch);
+        }
+        return sb.ToString();
+    }
 
     public static string Shift(string text, int key, string alphabet)
     {
