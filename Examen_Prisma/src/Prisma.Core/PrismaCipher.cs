@@ -25,7 +25,7 @@ public static class PrismaCipher
         return output;
     }
 
-    public static byte[] Decrypt(byte[] cipher, PrismaKeys k)
+    public static byte[] Decrypt(byte[] cipher, PrismaKeys k, PrismaTrace? trace = null)
     {
         if (cipher.Length % 2 != 0) throw new ArgumentException("El cifrado debe tener longitud par.");
         var output = new byte[cipher.Length];
@@ -35,8 +35,10 @@ public static class PrismaCipher
         for (int i = 0; i < cipher.Length; i += 2)
         {
             s = k.NextShift(s);
-            var (x, y) = ai.Mul((cipher[i] - s) & 0xFF, (cipher[i + 1] - s) & 0xFF);
+            int y0 = (cipher[i] - s) & 0xFF, y1 = (cipher[i + 1] - s) & 0xFF;
+            var (x, y) = ai.Mul(y0, y1);
             output[i] = (byte)(x ^ prev0); output[i + 1] = (byte)(y ^ prev1);
+            trace?.AddBlock(i / 2, output[i], output[i + 1], x, y, y0, y1, s, cipher[i], cipher[i + 1]);
             (prev0, prev1) = (cipher[i], cipher[i + 1]);
         }
         return output;
