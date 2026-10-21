@@ -6,4 +6,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Prisma.Core.Tests/Prisma.Core.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Prisma.Metrics/Prisma.Metrics.csproj" />
+  </Folder>
 </Solution>
