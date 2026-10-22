@@ -47,7 +47,7 @@ En otros proveedores los pasos son equivalentes: imagen desde `deploy/Dockerfile
   cd android && ./gradlew :app:assembleRelease -PserverUrl=https://<tu-dominio>
   ```
 
-La app solo permite HTTP sin cifrar hacia `10.0.2.2`/`localhost` (emulador). En la nube **debe** usarse HTTPS.
+La app acepta `http://` (útil en la red local, con un aviso de conexión sin cifrar) y `https://`. En la nube **usa HTTPS**: con HTTP, la contraseña y la imagen-llave viajarían sin cifrar.
 
 ## 6. Comprobación posterior
 1. `GET https://<tu-dominio>/api/health` → `{"status":"ok",…}`.

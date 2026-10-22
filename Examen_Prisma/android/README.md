@@ -47,8 +47,9 @@ En la pantalla de inicio de sesión, toca el ícono de ajustes (engrane), escrib
 usa **Probar conexión** (`GET /api/health`) y **Guardar**. La URL se guarda en el teléfono;
 **Restablecer** vuelve al valor con el que se compiló.
 
-HTTP sin cifrar solo se permite hacia `10.0.2.2`, `localhost` y `127.0.0.1`
-(`res/xml/network_security_config.xml`); cualquier otro servidor debe usar HTTPS.
+La app acepta servidores `http://` (por ejemplo `http://dev-services.lan:5080` en la red local) y
+`https://` (`res/xml/network_security_config.xml`). Con `http://` muestra un aviso de conexión sin cifrar:
+úsalo solo en una red de confianza; en la nube usa HTTPS.
 
 ## Estructura
 
