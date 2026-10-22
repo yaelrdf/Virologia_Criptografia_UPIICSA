@@ -88,7 +88,7 @@ add(
     ["Web", "HTML + CSS + JavaScript sin framework (`wwwroot`)", "Interfaz responsiva servida por la misma API"],
     ["Móvil", "Kotlin + Jetpack Compose, OkHttp, kotlinx.serialization", "App Android con las mismas funciones; URL del servidor configurable"],
     ["Despliegue", "Docker (imagen `aspnet:10.0`), volumen `/app/data`", "Servidor en la nube detrás de HTTPS"],
-    ["Pruebas", "xUnit (30 pruebas) + prototipo en Python", "Vectores Python = C#, propiedades matemáticas, ida y vuelta, ataques"],
+    ["Pruebas", "xUnit (30 pruebas), prototipo en Python, prueba de integración Android", "Vectores Python = C#, propiedades matemáticas, ida y vuelta, ataques, contrato de la API"],
   ], [0.14, 0.4, 0.46], "Tecnologías por capa."),
   H2("2.1 Modelo de datos"),
   ...tbl(["Tabla", "Campos", "Notas"], [
@@ -462,7 +462,7 @@ add(
 // ───────────────────────── 9. Métricas ─────────────────────────
 add(
   H1("9. Métricas medidas"),
-  P("Todas las cifras de esta sección las produce la herramienta `tools/Prisma.Metrics`, que ejecuta la implementación real de `Prisma.Core`. Ninguna es una estimación teórica. Se regeneran con `dotnet run --project tools/Prisma.Metrics -c Release`."),
+  P("Todas las cifras de esta sección las produce la herramienta `tools/Prisma.Metrics`, que ejecuta la implementación real de `Prisma.Core`. Ninguna es una estimación teórica. Se regeneran con `dotnet run --project tools/Prisma.Metrics -c Release`. Los tiempos dependen de la carga del equipo y sirven para comparar órdenes de magnitud, no como referencia absoluta."),
   ...markdown(metricas),
   H2("9.1 Interpretación"),
   ...bullets([
@@ -579,9 +579,19 @@ add(
     "Iniciar sesión. Si la cuenta tiene 2FA, la app pide elegir la imagen-llave (se puede tomar de Descargas).",
     "Usar las pestañas **Ocultar, Revelar, César, Comparador y Cuenta**. Para guardar un PNG, la app abre el selector de documentos; para enviarlo, usa **Compartir como archivo**.",
   ]),
+  ...tbl(["Pantalla", "Qué hace"], [
+    ["Inicio de sesión", "Usuario y contraseña; ícono de ajustes para cambiar y probar la URL del servidor. Si la cuenta tiene 2FA, aparece el paso 2 para elegir la imagen-llave con el selector de documentos."],
+    ["Registro", "Crea la cuenta con las mismas validaciones que la web."],
+    ["Ocultar", "Portadora del catálogo (rejilla de miniaturas) o de la galería; mensaje; modo PRISMA-L o LSB clásico; capacidad; resultado con PSNR y botones Guardar y Compartir como archivo."],
+    ["Revelar", "Elegir el PNG, modo y frase; muestra el mensaje o el error genérico junto con los bytes que vería un atacante."],
+    ["César", "Clave con control deslizante, interruptor de Ñ, cifrar, descifrar y romper con χ² (las 5 mejores claves)."],
+    ["Comparador", "Tarjetas por algoritmo con bytes, tiempo, entropía e integridad."],
+    ["Cuenta", "Estado del 2FA; activar (elige imagen y confirma contraseña, guarda `llave_<usuario>.png`) o desactivar; cerrar sesión."],
+  ], [0.2, 0.8], "Pantallas de la app Android."),
+  P("En pantallas anchas (≥ 600 dp) la app usa un riel de navegación lateral y muestra formulario y resultado lado a lado; en teléfono, barra inferior y una columna con desplazamiento."),
   ...(androidShots.length
     ? androidShots.flatMap((f) => img(SHOT(f), androidCaptions[f] || "App Android.", { maxW: 3.2, maxH: 5.6 }))
-    : [P("*Las capturas de la app Android se agregan al compilar el documento si existen en `docs/capturas/android_*.png`.*")]),
+    : []),
 );
 
 // ───────────────────────── 13. Despliegue ─────────────────────────
@@ -620,6 +630,7 @@ add(
     ["César", "CRIPTOGRAFIA → FULSWRJUDILD; HOLA → KROD; ida y vuelta con y sin Ñ; χ² encuentra la clave; ofuscación; las tildes no se filtran."],
     ["Esteganografía", "Ida y vuelta por PNG real; frase incorrecta y bit alterado → error genérico; capacidad; LSB clásico legible y PRISMA-L no; χ² detecta un LSB saturado; reducción de portadoras grandes."],
   ], [0.3, 0.7], "Pruebas automatizadas."),
+  P("La app Android tiene una prueba de integración (`ApiClientIntegrationTest`, JVM) que usa el mismo cliente HTTP de la app contra el servidor en ejecución: registro, login, sesión expirada, catálogo, capacidad, ocultar y revelar en ambos modos, frase incorrecta (422 con los bytes del atacante), César, comparador y el ciclo completo del 2FA. Pasó sin fallos. La interfaz gráfica no se ejecutó en un emulador porque el equipo de desarrollo (2 núcleos, 5 GB de RAM) no lo soporta; se verificó que compila sin advertencias y que el APK está firmado (esquema v2)."),
   P("Además se probaron de punta a punta, contra el servidor en ejecución: registro, login sin y con 2FA (llave correcta, imagen equivocada, contraseña equivocada), ocultar y revelar en ambos modos, comparador, laboratorio César, rutas de administración (un usuario normal recibe 403) y la versión Release en modo producción con variables de entorno, igual que en el contenedor."),
 );
 
