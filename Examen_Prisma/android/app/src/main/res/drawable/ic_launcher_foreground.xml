@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prisma que descompone un haz de luz -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="2.5"
+        android:pathData="M24,58 L46,52" />
+    <path android:fillColor="#33FFFFFF" android:strokeColor="#FFFFFF" android:strokeWidth="3"
+        android:strokeLineJoin="round"
+        android:pathData="M54,30 L72,70 L36,70 Z" />
+    <path android:fillColor="#FF5252" android:pathData="M60,50 L86,46 L86,50 L61,53 Z" />
+    <path android:fillColor="#FFD740" android:pathData="M61,53 L86,50 L86,54 L62,56 Z" />
+    <path android:fillColor="#69F0AE" android:pathData="M62,56 L86,54 L86,58 L63,59 Z" />
+    <path android:fillColor="#40C4FF" android:pathData="M63,59 L86,58 L86,62 L64,62 Z" />
+    <path android:fillColor="#B388FF" android:pathData="M64,62 L86,62 L86,66 L65,65 Z" />
+</vector>
