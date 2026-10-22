@@ -615,7 +615,7 @@ dotnet run --project src/Prisma.Api --launch-profile http # http://localhost:508
   ...code(`cd android
 ./gradlew :app:assembleRelease -PserverUrl=https://<dominio>   # URL por defecto del APK
 # APK firmado: app/build/outputs/apk/release/ (copiado a android/dist/Prisma-L.apk)`),
-  P("Sin recompilar, la URL también se cambia en la app. Por seguridad, la app solo permite HTTP sin cifrar hacia el emulador (`10.0.2.2`) y `localhost`; en la nube debe usarse HTTPS."),
+  P("Sin recompilar, la URL también se cambia en la app. La app acepta servidores `http://` (por ejemplo, un equipo de la red local) y `https://`; con `http://` muestra un aviso de conexión sin cifrar. En la nube debe usarse HTTPS, porque con HTTP la contraseña y la imagen-llave viajarían sin cifrar."),
 );
 
 // ───────────────────────── 14. Pruebas ─────────────────────────
@@ -630,7 +630,7 @@ add(
     ["César", "CRIPTOGRAFIA → FULSWRJUDILD; HOLA → KROD; ida y vuelta con y sin Ñ; χ² encuentra la clave; ofuscación; las tildes no se filtran."],
     ["Esteganografía", "Ida y vuelta por PNG real; frase incorrecta y bit alterado → error genérico; capacidad; LSB clásico legible y PRISMA-L no; χ² detecta un LSB saturado; reducción de portadoras grandes."],
   ], [0.3, 0.7], "Pruebas automatizadas."),
-  P("La app Android tiene una prueba de integración (`ApiClientIntegrationTest`, JVM) que usa el mismo cliente HTTP de la app contra el servidor en ejecución: registro, login, sesión expirada, catálogo, capacidad, ocultar y revelar en ambos modos, frase incorrecta (422 con los bytes del atacante), César, comparador y el ciclo completo del 2FA. Pasó sin fallos. La interfaz gráfica no se ejecutó en un emulador porque el equipo de desarrollo (2 núcleos, 5 GB de RAM) no lo soporta; se verificó que compila sin advertencias y que el APK está firmado (esquema v2)."),
+  P("La app Android tiene una prueba de integración (`ApiClientIntegrationTest`, JVM) que usa el mismo cliente HTTP de la app contra el servidor en ejecución: registro, login, sesión expirada, catálogo, capacidad, ocultar y revelar en ambos modos, frase incorrecta (422 con los bytes del atacante), César, comparador y el ciclo completo del 2FA. Pasó sin fallos. Además, la app se probó en un **teléfono real con Android 11** (Samsung SM-A305G) contra el servidor en la red local (`http://dev-services.lan:5080`): conexión, registro, inicio de sesión, ocultar y guardar el PNG en Descargas, revelarlo en el teléfono y en el servidor, romper César, comparador, activar el 2FA y volver a entrar con usuario, contraseña e imagen-llave. Esa prueba detectó que la política de red solo permitía HTTP hacia el emulador; se corrigió para aceptar servidores `http://` de la red local, con un aviso de conexión sin cifrar."),
   P("Además se probaron de punta a punta, contra el servidor en ejecución: registro, login sin y con 2FA (llave correcta, imagen equivocada, contraseña equivocada), ocultar y revelar en ambos modos, comparador, laboratorio César, rutas de administración (un usuario normal recibe 403) y la versión Release en modo producción con variables de entorno, igual que en el contenedor."),
 );
 

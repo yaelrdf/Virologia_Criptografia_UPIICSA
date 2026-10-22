@@ -73,6 +73,7 @@ fun LoginScreen(vm: AppViewModel) {
             }
             Text("Servidor: ${vm.serverUrl}", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (isCleartext(vm.serverUrl)) CleartextWarning()
 
             ElevatedCard(Modifier.fillMaxWidth()) {
                 if (s.awaitingKey) KeyStep(vm) else CredentialsStep(vm)
@@ -186,6 +187,7 @@ fun ServerDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     }
                     Text("Probar conexión")
                 }
+                if (isCleartext(url)) CleartextWarning()
                 t.message?.let {
                     Text(
                         it, style = MaterialTheme.typography.bodySmall,
@@ -201,5 +203,17 @@ fun ServerDialog(vm: AppViewModel, onDismiss: () -> Unit) {
             TextButton(onClick = { if (vm.saveServer(url)) onDismiss() else invalid = true }) { Text("Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+/** true si la URL usa HTTP sin cifrar. */
+private fun isCleartext(url: String) = url.trim().startsWith("http://", ignoreCase = true)
+
+@Composable
+private fun CleartextWarning() {
+    Text(
+        "Conexión sin cifrar (HTTP): úsala solo en una red de confianza. En la nube usa https://.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.tertiary,
     )
 }

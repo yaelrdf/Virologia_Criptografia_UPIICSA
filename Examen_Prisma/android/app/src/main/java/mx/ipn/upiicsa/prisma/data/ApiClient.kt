@@ -15,7 +15,11 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.net.UnknownServiceException
 import java.util.concurrent.TimeUnit
 
 /** Error de la API con el mensaje (en español) que se muestra al usuario. */
@@ -192,6 +196,15 @@ class ApiClient(
             throw e
         } catch (e: SocketTimeoutException) {
             throw ApiException(0, "El servidor tardó demasiado en responder ($root).")
+        } catch (e: UnknownHostException) {
+            throw ApiException(0, "No se encontró el servidor «${url.host}». Revisa el nombre o usa su dirección IP.")
+        } catch (e: ConnectException) {
+            throw ApiException(0, "El servidor rechazó la conexión en ${url.host}:${url.port}. ¿Está encendido y escuchando en ese puerto?")
+        } catch (e: NoRouteToHostException) {
+            throw ApiException(0, "No hay ruta de red hacia ${url.host}. Revisa que el teléfono y el servidor se puedan comunicar.")
+        } catch (e: UnknownServiceException) {
+            // Política de seguridad de red de Android (p. ej. HTTP sin cifrar no permitido).
+            throw ApiException(0, "Android bloqueó la conexión a $root: ${e.message}")
         } catch (e: IOException) {
             if (call.isCanceled()) throw CancellationException("Petición cancelada")
             throw ApiException(0, "No se pudo conectar con el servidor ($root). Revisa tu conexión o la URL en ajustes.")
