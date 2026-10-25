@@ -5,7 +5,7 @@ namespace Prisma.Core;
 /// <summary>Cifrado César clásico: C = (P + k) mod n sobre un alfabeto; conserva mayúsculas/minúsculas.</summary>
 public static class Caesar
 {
-    public const string Latin = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";      // n = 26 (como el material base)
+    public const string Latin = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";      // n = 26
     public const string Spanish = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ";   // n = 27
 
     public static string AlphabetFor(bool withEnye) => withEnye ? Spanish : Latin;
@@ -15,7 +15,7 @@ public static class Caesar
 
     /// <summary>
     /// Quita tildes y diéresis (á → a, ü → u) para que todas las letras pasen por el alfabeto, como en el
-    /// material base ("el ejemplo omite tildes"). La Ñ se conserva solo si el alfabeto la incluye; si no, pasa a N.
+    /// cifrado César clásico. La Ñ se conserva solo si el alfabeto la incluye; si no, pasa a N.
     /// </summary>
     public static string Normalize(string text, bool withEnye)
     {

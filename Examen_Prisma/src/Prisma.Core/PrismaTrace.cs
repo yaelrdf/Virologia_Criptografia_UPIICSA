@@ -1,6 +1,6 @@
 namespace Prisma.Core;
 
-/// <summary>Traza paso a paso de una operación PRISMA-L, para la consola de administrador (modo demo).</summary>
+/// <summary>Traza paso a paso de una operación ABCO, para la consola de administrador (modo demo).</summary>
 public sealed class PrismaTrace
 {
     public const int MaxBlocks = 6;
@@ -36,7 +36,7 @@ public sealed class PrismaTrace
     public override string ToString()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"PRISMA-L · {Operation}");
+        sb.AppendLine($"ABCO · {Operation}");
         sb.AppendLine($"  sal = {SaltHex}");
         sb.AppendLine($"  A = {Matrix}  det = {Det}  A⁻¹ = {Inverse}");
         sb.AppendLine($"  César dinámico: s₀ = {S0}, sᵢ = ({Mult}·sᵢ₋₁ + {Inc}) mod 256;  C₀ = {C0}");

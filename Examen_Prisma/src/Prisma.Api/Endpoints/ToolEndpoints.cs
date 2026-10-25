@@ -39,7 +39,7 @@ public static class ToolEndpoints
             });
         });
 
-        // Ocultar: modo "prisma" (PRISMA-L, requiere frase) o "clasico" (LSB secuencial del material base, sin clave).
+        // Ocultar: modo "prisma" (ABCO, requiere frase) o "clasico" (esteganografía secuencial, sin clave).
         g.MapPost("/embed", async (HttpContext ctx, CatalogService catalog, AuditService audit, TraceStore traces) =>
         {
             var sw = Stopwatch.StartNew();
@@ -97,23 +97,9 @@ public static class ToolEndpoints
             catch (Exception ex) when (ex is StegoException or InvalidDataException)
             {
                 await audit.LogAsync(ctx.User, "revelar", mode, 0, sw, false);
-                // Lo que vería un atacante leyendo los LSB en orden (útil para el escenario E2).
+                // Lo que vería un atacante leyendo los bits menos significativos en orden (escenario E2).
                 return Results.Json(new { error = ex.Message, rawSequentialHex = Http.Hex(LsbClassic.RawSequential(img!, 32)) }, statusCode: 422);
             }
-        });
-
-        // Estegoanálisis χ² (Westfeld–Pfitzmann) sobre fracciones crecientes de la imagen.
-        g.MapPost("/analyze", async (HttpRequest req, CatalogService catalog) =>
-        {
-            if (!req.HasFormContentType) return Http.Error(400, "Se espera multipart/form-data.");
-            var (img, err) = await Http.ReadImageAsync(await req.ReadFormAsync(), catalog);
-            if (err is not null) return err;
-            double[] fractions = [0.01, 0.05, 0.10, 0.25, 0.50, 1.00];
-            return Results.Ok(new
-            {
-                width = img!.Width, height = img.Height,
-                chiSquare = fractions.Select(f => new { fraction = f, result = Steganalysis.ChiSquareAttack(img, f) }),
-            });
         });
     }
 
@@ -130,7 +116,7 @@ public static class ToolEndpoints
         });
     }
 
-    /// <summary>Corre todos los algoritmos sobre el mismo mensaje y compara salida, tamaño, tiempo, entropía e integridad.</summary>
+    /// <summary>Corre César, esteganografía clásica y ABCO sobre el mismo mensaje y compara salida, tamaño, tiempo, entropía e integridad.</summary>
     public static void MapCompare(this WebApplication app)
     {
         app.MapPost("/api/compare", (CompareBody b) =>
@@ -142,12 +128,12 @@ public static class ToolEndpoints
 
             var sw = Stopwatch.StartNew();
             string caesar = Caesar.Encrypt(b.Message, b.CaesarKey);
-            results.Add(Row("César", "Clásico (material base)", Encoding.UTF8.GetBytes(caesar), sw, false,
+            results.Add(Row("César", "Clásico", Encoding.UTF8.GetBytes(caesar), sw, false,
                 $"Salida: «{(caesar.Length > 60 ? caesar[..60] + "…" : caesar)}». Conserva el histograma: se rompe con χ²."));
 
             sw.Restart();
-            results.Add(Row("LSB clásico", "Esteganografía (material base)", plain, sw, false,
-                "No cifra: los bits del mensaje van tal cual a los LSB, en orden. Cualquiera los lee."));
+            results.Add(Row("Esteganografía clásica", "Ocultamiento", plain, sw, false,
+                "No cifra: los bits del mensaje van tal cual a los bits menos significativos, en orden. Cualquiera los lee."));
 
             sw.Restart();
             byte[] salt = RandomNumberGenerator.GetBytes(16);
@@ -157,16 +143,8 @@ public static class ToolEndpoints
             sw.Stop();
             byte[] tampered = (byte[])pc.Clone(); tampered[0] ^= 1;
             bool prismaDetects = !CryptographicOperations.FixedTimeEquals(HMACSHA256.HashData(k.KMac, tampered)[..8], tag);
-            results.Add(Row("PRISMA-L", "Inventado", [.. salt, .. pc, .. tag], sw, prismaDetects,
+            results.Add(Row("ABCO", "Inventado", [.. salt, .. pc, .. tag], sw, prismaDetects,
                 $"A = {k.A}, det = {ModMath.Det(k.A)}; César dinámico sᵢ = ({k.Mult}·sᵢ₋₁ + {k.Inc}) mod 256. Incluye sal(16) y HMAC(8)."));
-
-            sw.Restart();
-            byte[] aes = AesGcmRef.Encrypt(plain, b.Passphrase!);
-            sw.Stop();
-            byte[] aesBad = (byte[])aes.Clone(); aesBad[30] ^= 1;
-            bool aesDetects;
-            try { AesGcmRef.Decrypt(aesBad, b.Passphrase!); aesDetects = false; } catch (CryptographicException) { aesDetects = true; }
-            results.Add(Row("AES-256-GCM", "Comercial (referencia)", aes, sw, aesDetects, "Incluye sal(16), nonce(12) y etiqueta GCM(16)."));
 
             return Results.Ok(new { plainBytes = plain.Length, plainEntropy = Math.Round(Metrics.Entropy(plain), 3), results });
         }).RequireAuthorization();

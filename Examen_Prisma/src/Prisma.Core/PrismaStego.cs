@@ -10,7 +10,7 @@ public sealed class StegoException(string message) : Exception(message)
 }
 
 /// <summary>
-/// Capa esteganográfica de PRISMA-L.
+/// Capa esteganográfica de ABCO.
 /// Sal (16 B) en los LSB de los canales 0..127; trama len(4) ‖ C ‖ HMAC[0..7] en los LSB
 /// de un recorrido Fisher–Yates sembrado con la clave.
 /// </summary>
@@ -98,7 +98,7 @@ public static class PrismaStego
     }
 }
 
-/// <summary>Esteganografía LSB clásica del material base: secuencial y sin clave. Cualquiera puede leerla.</summary>
+/// <summary>Esteganografía clásica: bits menos significativos en orden y sin clave. Cualquiera puede leerla.</summary>
 public static class LsbClassic
 {
     public static int Capacity(int channels) => Math.Max(0, channels / 8 - 4);
@@ -121,7 +121,7 @@ public static class LsbClassic
         if (ch.Length < 32) throw new StegoException("La imagen es demasiado pequeña.");
         int len = BinaryPrimitives.ReadInt32BigEndian(PrismaStego.ReadBits(ch, j => j, 4));
         if (len < 0 || len > Capacity(ch.Length))
-            throw new StegoException("La lectura secuencial de LSB no produce un mensaje legible (no hay mensaje clásico o está protegido).");
+            throw new StegoException("La lectura secuencial de los bits menos significativos no produce un mensaje legible (no hay mensaje clásico o está protegido).");
         return PrismaStego.ReadBits(ch, j => 32 + j, len);
     }
 

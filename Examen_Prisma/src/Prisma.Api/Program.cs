@@ -61,6 +61,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDb>();
     db.Database.EnsureCreated();
+    // EnsureCreated no migra: agrega la columna nueva a bases creadas por versiones anteriores.
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN MustChangePassword INTEGER NOT NULL DEFAULT 0"); }
+    catch (Microsoft.Data.Sqlite.SqliteException) { /* ya existe */ }
     await SeedAdmin(db, cfg, app.Logger);
     scope.ServiceProvider.GetRequiredService<CatalogService>();   // genera el catálogo si no existe
 }
@@ -73,7 +76,22 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "PRISMA-L", time = DateTime.UtcNow }));
+// Con contraseña temporal solo se permite consultar el perfil y cambiar la contraseña.
+app.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path;
+    if (ctx.User.HasClaim(TokenService.MustChangeClaim, "true") && path.StartsWithSegments("/api")
+        && !path.StartsWithSegments("/api/account/password") && !path.StartsWithSegments("/api/account/me")
+        && !path.StartsWithSegments("/api/auth") && !path.StartsWithSegments("/api/health"))
+    {
+        ctx.Response.StatusCode = 403;
+        await ctx.Response.WriteAsJsonAsync(new { error = "Debes cambiar tu contraseña temporal antes de continuar." });
+        return;
+    }
+    await next();
+});
+
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "ABCO", time = DateTime.UtcNow }));
 app.MapAuth();
 app.MapAccount();
 app.MapCatalog();

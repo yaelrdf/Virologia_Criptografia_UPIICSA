@@ -2,7 +2,7 @@ using Prisma.Core;
 
 namespace Prisma.Api.Services;
 
-/// <summary>Guarda en memoria la traza y el mapa de diferencias de la última operación PRISMA-L (modo demo).</summary>
+/// <summary>Guarda en memoria la traza y el mapa de diferencias de la última operación ABCO (modo demo).</summary>
 public sealed class TraceStore(IConfiguration cfg, ILogger<TraceStore> log)
 {
     private readonly object _gate = new();

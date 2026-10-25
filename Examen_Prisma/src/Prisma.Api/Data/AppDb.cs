@@ -12,6 +12,8 @@ public sealed class User
     /// <summary>SHA-256 del token de 32 B oculto en la imagen-llave (nunca se guarda el token).</summary>
     public byte[]? KeyTokenHash { get; set; }
     public string Role { get; set; } = Roles.User;
+    /// <summary>true tras un restablecimiento por el administrador: el usuario debe elegir otra contraseña.</summary>
+    public bool MustChangePassword { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 }
 
