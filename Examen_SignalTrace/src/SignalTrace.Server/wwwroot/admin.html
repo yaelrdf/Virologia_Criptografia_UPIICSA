@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Usuarios</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <main>
+    <div class="page-head"><h1>Usuarios y servidor</h1></div>
+    <div class="grid two">
+      <section class="card">
+        <h2>Usuarios</h2>
+        <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>PBKDF2</th><th>Alta</th><th></th></tr></thead><tbody id="users"></tbody></table></div>
+      </section>
+      <section class="card">
+        <h2>Nuevo usuario</h2>
+        <form id="f">
+          <div class="field"><label for="u">Usuario</label><input id="u" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\-]+" autocomplete="off"></div>
+          <div class="field"><label for="p">Contraseña (mínimo 8)</label><input id="p" type="password" required minlength="8" autocomplete="new-password"></div>
+          <div class="field"><label for="r">Rol</label><select id="r"><option value="viewer">viewer (ve solo sus dispositivos)</option><option value="admin">admin</option></select></div>
+          <button class="primary" type="submit">Crear</button>
+        </form>
+        <p class="small muted" style="margin-top:10px">La contraseña se guarda como PBKDF2-HMAC-SHA256 con sal aleatoria de 16 B; nunca en claro. El login compara en tiempo constante y espera de forma creciente tras 5 fallos.</p>
+      </section>
+      <section class="card">
+        <h2>Identidad del servidor</h2>
+        <dl class="kv" id="server"></dl>
+      </section>
+      <section class="card">
+        <h2>Historial de paquetes</h2>
+        <div class="table-wrap"><table><thead><tr><th>Estado</th><th>Paquetes</th></tr></thead><tbody id="stats"></tbody></table></div>
+        <p class="small muted" style="margin-top:8px">Se registran también los rechazados (sin texto claro): estado, motivo, tamaño y huella de la IP origen.</p>
+      </section>
+    </div>
+  </main>
+  <script type="module">
+    import { api, esc, fmtDateTime, toast, getAuth } from "./js/api.js";
+    import { requireAuth, renderShell } from "./js/ui/shell.js";
+    requireAuth({ admin: true });
+    renderShell("admin.html");
+    const me = getAuth().username;
+    async function load() {
+      const users = await api("/api/users");
+      document.getElementById("users").innerHTML = users.map((u) => `<tr><td>${esc(u.username)}</td><td>${esc(u.role)}</td>
+        <td>${u.iterations.toLocaleString("es-MX")} it.</td><td>${fmtDateTime(u.createdAt)}</td>
+        <td>${u.username === me ? "" : `<button data-del="${u.id}">Eliminar</button>`}</td></tr>`).join("");
+      const stats = await api("/api/stats");
+      document.getElementById("stats").innerHTML = stats.packets.map((p) => `<tr><td>${esc(p.status)}</td><td>${p.count}</td></tr>`).join("")
+        + `<tr><td><b>Lecturas guardadas</b></td><td>${stats.readings}</td></tr><tr><td><b>Dispositivos</b></td><td>${stats.devices}</td></tr>`;
+      const key = await api("/api/server-key");
+      const health = await api("/healthz");
+      document.getElementById("server").innerHTML = `<dt>Huella SHA-256</dt><dd class="mono">${key.fingerprint.match(/.{4}/g).join(" ")}</dd>
+        <dt>Llave pública</dt><dd class="mono small">${esc(key.publicKey)}</dd><dt>Suites</dt><dd>${key.suites.join(", ")}</dd>
+        <dt>Sesiones activas</dt><dd>${health.sessions}</dd><dt>API</dt><dd><a href="/scalar" target="_blank" rel="noopener">/scalar</a> · <a href="/openapi/v1.json" target="_blank" rel="noopener">OpenAPI</a></dd>`;
+    }
+    document.getElementById("users").addEventListener("click", async (e) => {
+      const id = e.target.dataset.del;
+      if (!id || !confirm("¿Eliminar este usuario?")) return;
+      try { await api(`/api/users/${id}`, { method: "DELETE" }); load(); } catch (err) { toast(err.message); }
+    });
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api("/api/users", { method: "POST", body: { username: u.value.trim(), password: p.value, role: r.value } });
+        toast("Usuario creado"); e.target.reset(); load();
+      } catch (err) { toast(err.message); }
+    });
+    load();
+  </script>
+</body>
+</html>

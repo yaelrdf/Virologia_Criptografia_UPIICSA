@@ -108,6 +108,32 @@ Notas:
 - **Exportaciones:** CSV, GeoJSON y KML.
 - **QR de vinculación:** sirve para la app Android.
 
+## Consola, laboratorio y usuarios (solo admin)
+
+- **`console.html`:** cada paquete aceptado o rechazado llega por SignalR. Se muestra por etapas:
+  - bytes en el cable;
+  - verificación;
+  - nonce, AAD y etiqueta del AEAD;
+  - SigMix ronda por ronda, con k, m, rot, la matriz K y los bytes que cambian;
+  - texto claro.
+
+  Incluye la entropía por etapa, un contraste con César y una animación «Paso a paso».
+- **`lab.html`:** «Ejecutar todos» corre 13 escenarios con un dispositivo de laboratorio real y los compara con el resultado esperado:
+  - normal;
+  - Eve;
+  - bit flip;
+  - replay;
+  - AAD alterado;
+  - MITM;
+  - sesión perdida;
+  - contenido inválido;
+  - token ajeno;
+  - ChaCha20;
+  - ataque a SigMix;
+  - César;
+  - ejemplo de mano.
+- **`admin.html`:** alta y baja de usuarios, la identidad del servidor y el historial de paquetes por estado.
+
 ## Pruebas
 
 ```bash

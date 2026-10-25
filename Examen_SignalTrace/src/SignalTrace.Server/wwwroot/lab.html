@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Laboratorio</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <main>
+    <div class="page-head">
+      <h1>Laboratorio de escenarios</h1>
+      <button id="run-all" class="primary">Ejecutar todos</button>
+    </div>
+    <p class="muted small">Cada escenario usa un dispositivo de laboratorio real, un handshake real y peticiones HTTP reales contra este servidor. Abre la <a href="console.html">Consola</a> en otra pestaña para ver cómo llega cada paquete.</p>
+    <div class="grid two" style="margin-bottom:16px">
+      <section class="card"><h2>Resumen</h2><div id="summary" class="table-wrap"><p class="muted small">Pulsa “Ejecutar todos”.</p></div></section>
+      <section class="card"><h2>Configuración del servidor</h2><dl class="kv" id="cfg"></dl>
+        <p class="small muted" style="margin-top:8px">Dispositivo de laboratorio: <span class="mono" id="dev"></span></p></section>
+    </div>
+    <div class="grid auto" id="scenarios"></div>
+  </main>
+  <script type="module" src="js/lab.js"></script>
+</body>
+</html>
