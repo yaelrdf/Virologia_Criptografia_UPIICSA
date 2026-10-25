@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>SignalTrace.Server</RootNamespace>
+    <UserSecretsId>signaltrace-server-6nv68</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SignalTrace.Core\SignalTrace.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="MQTTnet" />
+    <PackageReference Include="MQTTnet.Server" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SignalTrace.Server.Tests" />
+  </ItemGroup>
+</Project>

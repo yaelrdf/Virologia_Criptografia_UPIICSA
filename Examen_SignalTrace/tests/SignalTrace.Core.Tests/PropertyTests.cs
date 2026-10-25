@@ -100,3 +100,29 @@ public class PropertyTests
         Assert.Equal(8, Entropy.Shannon(Enumerable.Range(0, 256).Select(i => (byte)i).ToArray()), 6);
     }
 }
+
+public class CryptanalysisTests
+{
+    [Fact]
+    public void LinearCongruence_And_ModInverse()
+    {
+        Assert.Equal(205, SigMixCryptanalysis.ModInverse(5, 256)); // 5 · 205 = 1025 ≡ 1
+        Assert.Equal([3], SigMixCryptanalysis.SolveLinear(5, 15).ToArray());
+        Assert.Equal([1, 129], SigMixCryptanalysis.SolveLinear(2, 2).OrderBy(v => v).ToArray());
+        Assert.Empty(SigMixCryptanalysis.SolveLinear(2, 3));
+    }
+
+    [Fact]
+    public void KnownPlaintext_Breaks_OneRound()
+    {
+        for (var trial = 0; trial < 5; trial++)
+        {
+            var secret = SigMix.DeriveParams(RandomNumberGenerator.GetBytes(32), (ulong)trial, rounds: 1);
+            var p1 = "{\"t\":1760000000000,\"src\":\"sim\",\"bat\":{\"lvl\":0.5}}"u8.ToArray();
+            var p2 = "{\"gps\":{\"lat\":19.5,\"lon\":-99.1}}"u8.ToArray();
+            var r = SigMixCryptanalysis.KnownPlaintextOneRound(p1, SigMix.EncryptWithParams(p1, secret));
+            Assert.NotNull(r.Params);
+            Assert.Equal(p2, SigMix.DecryptWithParams(SigMix.EncryptWithParams(p2, secret), r.Params!));
+        }
+    }
+}
