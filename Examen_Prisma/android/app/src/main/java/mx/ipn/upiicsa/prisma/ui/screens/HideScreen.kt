@@ -29,6 +29,7 @@ import mx.ipn.upiicsa.prisma.ui.components.ModeSelector
 import mx.ipn.upiicsa.prisma.ui.components.PasswordField
 import mx.ipn.upiicsa.prisma.ui.components.PngActions
 import mx.ipn.upiicsa.prisma.ui.components.SectionCard
+import mx.ipn.upiicsa.prisma.ui.components.bringIntoViewOnFocus
 import java.util.Locale
 
 @Composable
@@ -37,6 +38,7 @@ fun HideScreen(vm: AppViewModel) {
     AdaptivePane(
         title = "Ocultar mensaje",
         subtitle = "Elige una portadora, escribe el mensaje y genera un PNG con el mensaje oculto.",
+        hasResult = s.result != null || s.loading || s.error != null,
         form = {
             SectionCard("1. Imagen portadora") {
                 CatalogOrGalleryPicker(vm, s.image, onSelect = vm::selectCover)
@@ -45,15 +47,16 @@ fun HideScreen(vm: AppViewModel) {
                 ModeSelector(s.mode) { s.mode = it }
                 Text(
                     if (s.mode == StegoMode.PRISMA)
-                        "PRISMA-L cifra el mensaje con tu frase y lo dispersa en píxeles pseudoaleatorios."
-                    else "LSB clásico escribe los bits en orden y sin clave: cualquiera puede leerlos.",
+                        "ABCO cifra el mensaje con tu frase y lo dispersa en píxeles pseudoaleatorios."
+                    else "La esteganografía clásica escribe los bits en orden en los bits menos significativos, " +
+                        "sin clave: cualquiera puede leerlos.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = s.message, onValueChange = { s.message = it },
                     label = { Text("Mensaje secreto") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).bringIntoViewOnFocus(),
                 )
                 if (s.mode == StegoMode.PRISMA) {
                     PasswordField(
@@ -78,7 +81,7 @@ fun HideScreen(vm: AppViewModel) {
                     InfoRow("PSNR", r.psnr?.let { formatPsnr(it) } ?: "—")
                     InfoRow("Bytes usados / capacidad", "${r.payloadBytes ?: "—"} / ${r.capacity ?: "—"}")
                     if (r.resized) InfoRow("Portadora", "reducida a ≤ 1280 px")
-                    val fileName = remember(r) { "prisma_${System.currentTimeMillis() / 1000}.png" }
+                    val fileName = remember(r) { "abco_${System.currentTimeMillis() / 1000}.png" }
                     PngActions(vm, r.png, fileName)
                     Text(
                         "Comparte el archivo PNG tal cual: enviarlo «como foto» lo recomprime y destruye el mensaje.",

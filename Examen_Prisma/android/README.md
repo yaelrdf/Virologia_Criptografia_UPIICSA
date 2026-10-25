@@ -1,9 +1,43 @@
-# PRISMA-L · App Android
+# ABCO · App Android
 
-Cliente Android (Kotlin + Jetpack Compose, Material 3) del sistema PRISMA-L. Es un cliente delgado:
-toda la criptografía se calcula en el servidor ASP.NET Core (contrato en `../docs/API.md`).
+Cliente Android (Kotlin + Jetpack Compose, Material 3) del sistema ABCO (antes PRISMA-L). Es un cliente
+delgado: toda la criptografía se calcula en el servidor ASP.NET Core (contrato en `../docs/API.md`).
 
-Paquete `mx.ipn.upiicsa.prisma` · minSdk 26 · target/compileSdk 37.
+Paquete `mx.ipn.upiicsa.prisma` · minSdk 26 · target/compileSdk 37. El paquete, el `applicationId` y la
+firma no cambiaron con el nuevo nombre, así que el APK se instala encima de las versiones anteriores.
+
+## Funciones
+
+- **Ocultar / Revelar**: modo ABCO (con frase) o esteganografía clásica (bits menos significativos en orden).
+- **César** (cifrar, descifrar, romper con χ²) y **Comparador** (César, esteganografía clásica y ABCO).
+- **Cuenta**: perfil, tema, cambiar contraseña y doble factor con imagen-llave.
+- **Contraseñas**: «¿Olvidaste tu contraseña?» en el login indica contactar al administrador. Si el
+  administrador la restableció (`mustChangePassword`), la app muestra la pantalla obligatoria
+  «Cambia tu contraseña» antes de la navegación y usa el token nuevo que devuelve el servidor. Cambiar la
+  contraseña desactiva el 2FA (hay que generar otra imagen-llave). Todos los campos de contraseña y frase
+  van ocultos, con botón **Ver**.
+- **Admin** (solo rol `admin`): usuarios con nombre ofuscado y botón **Revelar**; restablecer contraseña
+  (muestra una sola vez la contraseña temporal, con **Copiar**), hacer o quitar administrador (muestra el
+  error 409 del servidor) y restablecer 2FA; auditoría de las últimas 50 operaciones en hora local; traza
+  de la última operación ABCO y su mapa de diferencias. Botón **Actualizar**.
+
+## Tema
+
+Paleta común con la web (verde sobre grises). En **Cuenta** y en el diálogo de ajustes del login hay un
+selector **Automático / Claro / Oscuro** que se guarda en el teléfono (`prisma_settings`, el mismo archivo
+que la URL del servidor). Automático sigue el modo del sistema. Las barras del sistema se ajustan al tema
+elegido para que sus íconos se lean en ambos modos.
+
+## Diseño adaptable
+
+- Ventana < 600 dp de ancho: barra de navegación inferior (con 6 destinos, solo el seleccionado lleva
+  etiqueta). ≥ 600 dp: NavigationRail con scroll vertical; con altura < 480 dp (teléfono en horizontal)
+  solo el ítem seleccionado lleva etiqueta.
+- Pantallas con formulario y resultado: con ≥ 560 dp de panel y sin resultado, las tarjetas del formulario
+  se reparten en 2 columnas; con resultado, formulario | resultado. Ancho máximo 1200 dp.
+- Login en 2 columnas (logo y descripción | formulario) desde 720 dp.
+- Los contenedores con scroll usan `imePadding()` y los campos se desplazan a la vista al recibir el foco,
+  para que el teclado no los tape.
 
 ## Requisitos
 
@@ -37,13 +71,19 @@ Sin ese archivo el APK release sale sin firmar. Verificación:
 
 ### Prueba de integración
 
-`./gradlew :app:testDebugUnitTest` ejecuta el flujo completo de la API (registro, login con 2FA, ocultar,
-revelar, César, comparador) contra `http://localhost:5080` o `PRISMA_TEST_SERVER`. Si el servidor no
-responde, la prueba se omite. Crea un usuario `android_test_*` en el servidor.
+`./gradlew :app:testDebugUnitTest` ejecuta contra `http://localhost:5080` o `PRISMA_TEST_SERVER`:
+
+- el flujo completo de la API (registro, login con 2FA, ocultar, revelar, César, comparador de 3 resultados);
+- restablecer contraseña como administrador → login con `mustChangePassword` → ruta bloqueada (403) →
+  cambiar contraseña → el token nuevo funciona; además, rol (409 al quitarse el admin a uno mismo) y desofuscar.
+
+El administrador se toma de `PRISMA_TEST_ADMIN` / `PRISMA_TEST_ADMIN_PASSWORD` (por defecto
+`admin` / `Admin#Prisma2026`). Si el servidor no responde, las pruebas se omiten. Crea usuarios
+`android_test_*` y `android_rst_*` en el servidor. Hace 8 peticiones a `/api/auth/*` (límite: 10 por minuto).
 
 ## Cambiar el servidor desde la app
 
-En la pantalla de inicio de sesión, toca el ícono de ajustes (engrane), escribe la URL,
+En la pantalla de inicio de sesión, toca el ícono de ajustes (engrane; ahí también está el tema), escribe la URL,
 usa **Probar conexión** (`GET /api/health`) y **Guardar**. La URL se guarda en el teléfono;
 **Restablecer** vuelve al valor con el que se compiló.
 
@@ -61,11 +101,15 @@ app/src/main/java/mx/ipn/upiicsa/prisma/
 │   ├── ApiClient.kt         OkHttp + kotlinx.serialization, manejo de errores (401/413/429/red)
 │   ├── Models.kt            modelos del contrato
 │   ├── Files.kt             content:// URIs, decodificación, guardar y compartir (FileProvider)
-│   └── ServerPrefs.kt       URL del servidor en SharedPreferences
+│   └── ServerPrefs.kt       AppPrefs: URL del servidor y modo de tema en SharedPreferences
 └── ui/
     ├── PrismaApp.kt         navegación (barra inferior / NavigationRail ≥ 600 dp)
     ├── FeatureStates.kt     estado observable de cada pantalla
-    ├── components/          componentes comunes y selector de imágenes
-    ├── screens/             Login, Ocultar, Revelar, César, Comparador, Cuenta
-    └── theme/               tema claro/oscuro Material 3
+    ├── components/          AdaptivePane (1 o 2 columnas), campos, selector de imágenes
+    ├── screens/             Login, Ocultar, Revelar, César, Comparador, Cuenta (y cambio obligatorio de contraseña), Admin
+    └── theme/               paleta común con la web, claro/oscuro
 ```
+
+Íconos: `res/mipmap-*/ic_launcher_foreground.png` (panda dentro de la zona segura) sobre
+`@color/ic_launcher_background` (#2B2D2F), más `ic_launcher`/`ic_launcher_round` PNG heredados.
+El logo del login es `res/drawable-nodpi/logo_panda.png`.

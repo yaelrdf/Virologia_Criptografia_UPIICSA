@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import mx.ipn.upiicsa.prisma.AppViewModel
 import mx.ipn.upiicsa.prisma.data.StegoMode
 import mx.ipn.upiicsa.prisma.ui.components.AdaptivePane
@@ -35,6 +36,7 @@ fun RevealScreen(vm: AppViewModel) {
     AdaptivePane(
         title = "Revelar mensaje",
         subtitle = "Elige el PNG recibido y la frase con la que se ocultó el mensaje.",
+        hasResult = s.result != null || s.loading || s.error != null,
         form = {
             SectionCard("Imagen") {
                 OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth()) {
@@ -49,7 +51,10 @@ fun RevealScreen(vm: AppViewModel) {
             SectionCard("Modo y frase") {
                 ModeSelector(s.mode) { s.mode = it }
                 if (s.mode == StegoMode.PRISMA) {
-                    PasswordField(value = s.passphrase, onValueChange = { s.passphrase = it }, label = "Frase")
+                    PasswordField(
+                        value = s.passphrase, onValueChange = { s.passphrase = it }, label = "Frase",
+                        imeAction = ImeAction.Done, onDone = vm::extract,
+                    )
                 }
                 LoadingButton(
                     "Revelar", s.loading, onClick = vm::extract,
@@ -63,7 +68,7 @@ fun RevealScreen(vm: AppViewModel) {
                 ErrorCard(err) {
                     s.rawHex?.let { hex ->
                         Text(
-                            "Esto es lo que vería un atacante leyendo los LSB en orden:",
+                            "Esto es lo que vería un atacante leyendo los bits menos significativos en orden:",
                             style = MaterialTheme.typography.labelLarge,
                         )
                         SelectionContainer { Text(hex, style = MonoStyle) }

@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import mx.ipn.upiicsa.prisma.data.AccountInfo
+import mx.ipn.upiicsa.prisma.data.AdminUser
+import mx.ipn.upiicsa.prisma.data.AuditEntry
 import mx.ipn.upiicsa.prisma.data.CapacityResponse
 import mx.ipn.upiicsa.prisma.data.CompareResponse
 import mx.ipn.upiicsa.prisma.data.CrackResponse
@@ -14,6 +16,7 @@ import mx.ipn.upiicsa.prisma.data.EmbedResult
 import mx.ipn.upiicsa.prisma.data.ExtractResponse
 import mx.ipn.upiicsa.prisma.data.ImageSource
 import mx.ipn.upiicsa.prisma.data.StegoMode
+import mx.ipn.upiicsa.prisma.data.TraceResponse
 
 // Estado observable de cada pantalla. Vive en AppViewModel para sobrevivir a rotaciones
 // y se reinicia al cerrar sesión (no deja mensajes ni llaves en memoria).
@@ -101,7 +104,40 @@ class AccountState {
     var disablePassword by mutableStateOf("")
     var disabling by mutableStateOf(false)
 
+    // Cambiar contraseña
+    val password = PasswordChangeState()
+
     var error by mutableStateOf<String?>(null)
+}
+
+/** Formulario de cambio de contraseña (en Cuenta y en la pantalla obligatoria). */
+class PasswordChangeState {
+    var current by mutableStateOf("")
+    var newPassword by mutableStateOf("")
+    var confirm by mutableStateOf("")
+    var loading by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    /** true si el último cambio desactivó el 2FA (hay que generar otra imagen-llave). */
+    var twoFactorDisabled by mutableStateOf(false)
+}
+
+/** Pantalla de administración. */
+class AdminState {
+    var users by mutableStateOf<List<AdminUser>>(emptyList())
+    var audit by mutableStateOf<List<AuditEntry>>(emptyList())
+    var trace by mutableStateOf<TraceResponse?>(null)
+    var diffMap by mutableStateOf<ImageBitmap?>(null)
+    var loaded by mutableStateOf(false)
+    var loading by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+
+    /** Nombres revelados por id de usuario (se alternan con el ofuscado). */
+    var revealed by mutableStateOf<Map<Long, String>>(emptyMap())
+    /** Ids con una acción en curso (deshabilita sus botones). */
+    var busy by mutableStateOf<Set<Long>>(emptySet())
+
+    /** Contraseña temporal recién generada: se muestra una sola vez. */
+    var temporaryPassword by mutableStateOf<Pair<String, String>?>(null)
 }
 
 /** Estado del diálogo de servidor. */

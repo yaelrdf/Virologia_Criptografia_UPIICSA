@@ -30,6 +30,7 @@ import mx.ipn.upiicsa.prisma.ui.components.ButtonContent
 import mx.ipn.upiicsa.prisma.ui.components.ErrorCard
 import mx.ipn.upiicsa.prisma.ui.components.InfoRow
 import mx.ipn.upiicsa.prisma.ui.components.SectionCard
+import mx.ipn.upiicsa.prisma.ui.components.bringIntoViewOnFocus
 import mx.ipn.upiicsa.prisma.ui.theme.MonoStyle
 import java.util.Locale
 
@@ -39,13 +40,16 @@ fun CaesarScreen(vm: AppViewModel) {
     AdaptivePane(
         title = "Cifrado César",
         subtitle = "Desplaza cada letra k posiciones. Se rompe con análisis de frecuencias (χ²).",
+        hasResult = s.output != null || s.crack != null || s.error != null,
         form = {
-            SectionCard {
+            SectionCard("Texto") {
                 OutlinedTextField(
                     value = s.text, onValueChange = { s.text = it },
                     label = { Text("Texto") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).bringIntoViewOnFocus(),
                 )
+            }
+            SectionCard("Clave y acción") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Incluir Ñ", style = MaterialTheme.typography.bodyLarge)

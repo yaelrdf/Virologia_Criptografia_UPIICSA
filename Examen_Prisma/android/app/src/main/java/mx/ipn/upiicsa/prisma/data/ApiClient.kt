@@ -70,6 +70,10 @@ class ApiClient(
 
     suspend fun me(): AccountInfo = getJson("/api/account/me")
 
+    /** Cambia la contraseña; el cliente debe usar el token de `session` a partir de aquí. */
+    suspend fun changePassword(currentPassword: String, newPassword: String): ChangePasswordResponse =
+        postJson("/api/account/password", ChangePasswordRequest(currentPassword, newPassword))
+
     /** Devuelve el PNG de la imagen-llave. */
     suspend fun enable2fa(password: String, source: UploadSource): ByteArray {
         val body = multipart {
@@ -136,6 +140,42 @@ class ApiClient(
 
     suspend fun compare(message: String, passphrase: String, caesarKey: Int): CompareResponse =
         postJson("/api/compare", CompareRequest(message, passphrase, caesarKey))
+
+    // ---- Administración (rol admin) ----
+
+    suspend fun adminUsers(): List<AdminUser> = getJson("/api/admin/users")
+
+    suspend fun adminAudit(take: Int = 50): List<AuditEntry> = getJson("/api/admin/audit?take=$take")
+
+    suspend fun deobfuscate(text: String): String =
+        postJson<TextBody, TextBody>("/api/admin/deobfuscate", TextBody(text)).text
+
+    suspend fun resetUser2fa(id: Long) {
+        send("/api/admin/users/$id/reset-2fa") { post(EMPTY_BODY) }
+    }
+
+    /** Devuelve la contraseña temporal (el servidor la muestra una sola vez). */
+    suspend fun resetUserPassword(id: Long): String =
+        send("/api/admin/users/$id/reset-password") { post(EMPTY_BODY) }.decode<TemporaryPasswordResponse>()
+            .temporaryPassword
+
+    /** 409 con `error` si es uno mismo o el último administrador. */
+    suspend fun setUserRole(id: Long, role: String): RoleResponse =
+        postJson("/api/admin/users/$id/role", RoleBody(role))
+
+    /** null si todavía no hay operaciones ABCO (404). */
+    suspend fun lastTrace(): TraceResponse? = try {
+        getJson<TraceResponse>("/api/admin/trace/last")
+    } catch (e: ApiException) {
+        if (e.code == 404) null else throw e
+    }
+
+    /** PNG del mapa de diferencias de la última operación; null si no existe (404). */
+    suspend fun lastDiffMap(): ByteArray? = try {
+        send("/api/admin/diffmap/last") { get() }.bytes
+    } catch (e: ApiException) {
+        if (e.code == 404) null else throw e
+    }
 
     // ---- Infraestructura ----
 
@@ -241,6 +281,7 @@ class ApiClient(
 
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
+        private val EMPTY_BODY = ByteArray(0).toRequestBody(null)
         val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
