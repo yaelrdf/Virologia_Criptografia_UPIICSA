@@ -12,26 +12,32 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import mx.ipn.upiicsa.prisma.data.AdminUser
 import mx.ipn.upiicsa.prisma.data.ApiClient
+import mx.ipn.upiicsa.prisma.data.AppPrefs
 import mx.ipn.upiicsa.prisma.data.ApiClient.UploadSource
 import mx.ipn.upiicsa.prisma.data.ApiException
 import mx.ipn.upiicsa.prisma.data.CatalogItem
 import mx.ipn.upiicsa.prisma.data.Files
 import mx.ipn.upiicsa.prisma.data.ImageSource
 import mx.ipn.upiicsa.prisma.data.LoginResponse
-import mx.ipn.upiicsa.prisma.data.ServerPrefs
 import mx.ipn.upiicsa.prisma.data.Session
 import mx.ipn.upiicsa.prisma.data.SessionExpiredException
 import mx.ipn.upiicsa.prisma.data.StegoMode
+import mx.ipn.upiicsa.prisma.data.ThemeMode
 import mx.ipn.upiicsa.prisma.ui.AccountState
+import mx.ipn.upiicsa.prisma.ui.AdminState
 import mx.ipn.upiicsa.prisma.ui.CaesarState
 import mx.ipn.upiicsa.prisma.ui.CompareState
 import mx.ipn.upiicsa.prisma.ui.HideState
 import mx.ipn.upiicsa.prisma.ui.LoginState
+import mx.ipn.upiicsa.prisma.ui.PasswordChangeState
 import mx.ipn.upiicsa.prisma.ui.PickedImage
 import mx.ipn.upiicsa.prisma.ui.RevealState
 import mx.ipn.upiicsa.prisma.ui.ServerTestState
@@ -41,7 +47,16 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context get() = getApplication<Application>()
-    private val prefs = ServerPrefs(app)
+    private val prefs = AppPrefs(app)
+
+    // ---- Tema ----
+    var themeMode by mutableStateOf(prefs.themeMode)
+        private set
+
+    fun changeThemeMode(mode: ThemeMode) {
+        prefs.themeMode = mode
+        themeMode = mode
+    }
 
     // ---- Servidor y sesión ----
     var serverUrl by mutableStateOf(prefs.serverUrl)
@@ -63,6 +78,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var caesar by mutableStateOf(CaesarState()); private set
     var compare by mutableStateOf(CompareState()); private set
     var account by mutableStateOf(AccountState()); private set
+    var admin by mutableStateOf(AdminState()); private set
+    /** Formulario de la pantalla obligatoria "Cambia tu contraseña". */
+    var forcedPassword by mutableStateOf(PasswordChangeState()); private set
     val serverTest = ServerTestState()
 
     // ---- Catálogo ----
@@ -212,7 +230,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             username = r.username ?: login.username.trim(),
             role = r.role ?: "user",
             twoFactorEnabled = r.twoFactorEnabled,
+            mustChangePassword = r.mustChangePassword,
         )
+        // Con contraseña temporal se precarga en la pantalla obligatoria de cambio.
+        forcedPassword = PasswordChangeState().apply { if (r.mustChangePassword) current = login.password }
         login = LoginState()
         loadCatalog()
         refreshAccount()
@@ -226,6 +247,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         caesar = CaesarState()
         compare = CompareState()
         account = AccountState()
+        admin = AdminState()
+        forcedPassword = PasswordChangeState()
     }
 
     private fun expireSession() {
@@ -381,7 +404,50 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         launchApi({ s.loadingInfo = it }, { s.error = it.message }) {
             val me = api.me()
             s.info = me
-            session = session?.copy(role = me.role, twoFactorEnabled = me.twoFactorEnabled)
+            session = session?.copy(
+                role = me.role,
+                twoFactorEnabled = me.twoFactorEnabled,
+                mustChangePassword = me.mustChangePassword,
+            )
+        }
+    }
+
+    /**
+     * Cambia la contraseña con el formulario [s] (Cuenta o pantalla obligatoria).
+     * El servidor emite un token nuevo: se reemplaza la sesión con el de la respuesta.
+     */
+    fun changePassword(s: PasswordChangeState) {
+        s.error = when {
+            s.current.isEmpty() -> "Escribe tu contraseña actual."
+            s.newPassword.length < 8 -> "La nueva contraseña debe tener al menos 8 caracteres."
+            s.newPassword == s.current -> "La nueva contraseña debe ser distinta de la actual."
+            s.newPassword != s.confirm -> "Las contraseñas no coinciden."
+            else -> null
+        }
+        if (s.error != null) return
+        s.twoFactorDisabled = false
+        launchApi({ s.loading = it }, { s.error = it.message }) {
+            val r = api.changePassword(s.current, s.newPassword)
+            val body = r.session
+            if (body.token.isBlank()) throw ApiException(0, "El servidor no devolvió un token.")
+            session = Session(
+                token = body.token,
+                username = body.username.ifBlank { session?.username.orEmpty() },
+                role = body.role,
+                twoFactorEnabled = body.twoFactorEnabled,
+                mustChangePassword = body.mustChangePassword,
+            )
+            s.current = ""; s.newPassword = ""; s.confirm = ""
+            s.twoFactorDisabled = r.twoFactorDisabled
+            if (r.twoFactorDisabled) {
+                account.keyPng = null
+                account.keyPreview = null
+            }
+            notify(
+                if (r.twoFactorDisabled) "Contraseña cambiada. El 2FA se desactivó: genera otra imagen-llave."
+                else "Contraseña cambiada.",
+            )
+            refreshAccount()
         }
     }
 
@@ -418,6 +484,90 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             notify("2FA desactivado.")
             refreshAccount()
         }
+    }
+
+    // =========================== Administración ===========================
+
+    /** Carga usuarios, auditoría (50), traza y mapa de diferencias en paralelo. */
+    fun refreshAdmin() {
+        val s = admin
+        if (s.loading) return
+        s.error = null
+        launchApi({ s.loading = it }, { s.error = it.message }) {
+            coroutineScope {
+                val users = async { api.adminUsers() }
+                val audit = async { api.adminAudit(50) }
+                val trace = async { api.lastTrace() }
+                val diff = async { api.lastDiffMap()?.let { Files.decode(it, 1280) } }
+                s.users = users.await()
+                s.audit = audit.await()
+                s.trace = trace.await()
+                s.diffMap = diff.await()
+            }
+            s.loaded = true
+        }
+    }
+
+    private fun refreshAdminUsers() {
+        val s = admin
+        launchApi({}, { s.error = it.message }) { s.users = api.adminUsers() }
+    }
+
+    /** Ejecuta una acción sobre un usuario marcándolo como ocupado. */
+    private fun adminAction(user: AdminUser, block: suspend () -> Unit) {
+        val s = admin
+        s.error = null
+        launchApi(
+            { busy -> s.busy = if (busy) s.busy + user.id else s.busy - user.id },
+            { e -> s.error = e.message; e.message?.let(::notify) }, // p. ej. el 409 del cambio de rol
+        ) {
+            block()
+        }
+    }
+
+    /** Alterna el nombre ofuscado y el real (POST /api/admin/deobfuscate). */
+    fun toggleReveal(user: AdminUser) {
+        val s = admin
+        if (s.revealed.containsKey(user.id)) {
+            s.revealed = s.revealed - user.id
+            return
+        }
+        adminAction(user) {
+            val plain = api.deobfuscate(user.username)
+            s.revealed = s.revealed + (user.id to plain)
+        }
+    }
+
+    fun displayName(user: AdminUser): String = admin.revealed[user.id] ?: user.username
+
+    fun resetUserPassword(user: AdminUser) {
+        val s = admin
+        adminAction(user) {
+            val temp = api.resetUserPassword(user.id)
+            s.temporaryPassword = displayName(user) to temp
+            s.users = api.adminUsers()
+        }
+    }
+
+    fun setUserRole(user: AdminUser, makeAdmin: Boolean) {
+        val s = admin
+        adminAction(user) {
+            api.setUserRole(user.id, if (makeAdmin) "admin" else "user")
+            notify(if (makeAdmin) "Ahora es administrador." else "Se quitó el rol de administrador.")
+            s.users = api.adminUsers()
+        }
+    }
+
+    fun resetUser2fa(user: AdminUser) {
+        adminAction(user) {
+            api.resetUser2fa(user.id)
+            notify("2FA restablecido.")
+            refreshAdminUsers()
+        }
+    }
+
+    fun dismissTemporaryPassword() {
+        admin.temporaryPassword = null
     }
 
     // =========================== Archivos ===========================

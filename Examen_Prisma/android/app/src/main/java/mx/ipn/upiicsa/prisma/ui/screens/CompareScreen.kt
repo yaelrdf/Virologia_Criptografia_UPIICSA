@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import mx.ipn.upiicsa.prisma.AppViewModel
 import mx.ipn.upiicsa.prisma.data.CompareResult
@@ -26,6 +27,7 @@ import mx.ipn.upiicsa.prisma.ui.components.InfoRow
 import mx.ipn.upiicsa.prisma.ui.components.LoadingButton
 import mx.ipn.upiicsa.prisma.ui.components.PasswordField
 import mx.ipn.upiicsa.prisma.ui.components.SectionCard
+import mx.ipn.upiicsa.prisma.ui.components.bringIntoViewOnFocus
 import mx.ipn.upiicsa.prisma.ui.theme.MonoStyle
 import mx.ipn.upiicsa.prisma.ui.theme.successColor
 import java.util.Locale
@@ -35,15 +37,19 @@ fun CompareScreen(vm: AppViewModel) {
     val s = vm.compare
     AdaptivePane(
         title = "Comparador",
-        subtitle = "El mismo mensaje con César, LSB clásico, PRISMA-L y AES-256-GCM.",
+        subtitle = "El mismo mensaje con César, esteganografía clásica y ABCO.",
+        hasResult = s.result != null || s.loading || s.error != null,
         form = {
-            SectionCard {
+            SectionCard("Mensaje") {
                 OutlinedTextField(
                     value = s.message, onValueChange = { s.message = it },
                     label = { Text("Mensaje") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp).bringIntoViewOnFocus(),
                 )
-                PasswordField(value = s.passphrase, onValueChange = { s.passphrase = it }, label = "Frase (mínimo 4)")
+            }
+            SectionCard("Claves") {
+                PasswordField(value = s.passphrase, onValueChange = { s.passphrase = it }, label = "Frase ABCO (mínimo 4)",
+                    imeAction = ImeAction.Done)
                 Text("Clave César: ${s.caesarKey}", style = MaterialTheme.typography.titleMedium)
                 Slider(
                     value = s.caesarKey.toFloat(),

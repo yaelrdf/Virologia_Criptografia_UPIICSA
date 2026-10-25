@@ -16,6 +16,7 @@ data class LoginResponse(
     val username: String? = null,
     val role: String? = null,
     val twoFactorEnabled: Boolean = false,
+    val mustChangePassword: Boolean = false,
     val requires2fa: Boolean = false,
 )
 
@@ -28,11 +29,73 @@ data class AccountInfo(
     val username: String = "",
     val role: String = "",
     val twoFactorEnabled: Boolean = false,
+    val mustChangePassword: Boolean = false,
     val createdUtc: String = "",
 )
 
 @Serializable
 data class PasswordBody(val password: String)
+
+@Serializable
+data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
+
+/** Sesión que devuelve el servidor tras cambiar la contraseña. */
+@Serializable
+data class SessionBody(
+    val token: String = "",
+    val username: String = "",
+    val role: String = "user",
+    val twoFactorEnabled: Boolean = false,
+    val mustChangePassword: Boolean = false,
+)
+
+@Serializable
+data class ChangePasswordResponse(val twoFactorDisabled: Boolean = false, val session: SessionBody = SessionBody())
+
+// ---- Administración ----
+
+@Serializable
+data class AdminUser(
+    val id: Long = 0,
+    /** Ofuscado con César por el servidor; se revela con /api/admin/deobfuscate. */
+    val username: String = "",
+    val role: String = "user",
+    val twoFactorEnabled: Boolean = false,
+    val mustChangePassword: Boolean = false,
+    val createdUtc: String = "",
+)
+
+@Serializable
+data class AuditEntry(
+    val id: Long = 0,
+    val user: String? = null,
+    val action: String = "",
+    val mode: String? = null,
+    val bytes: Long = 0,
+    val ms: Double = 0.0,
+    val ok: Boolean = false,
+    val utc: String = "",
+)
+
+@Serializable
+data class TextBody(val text: String)
+
+@Serializable
+data class RoleBody(val role: String)
+
+@Serializable
+data class RoleResponse(val id: Long = 0, val role: String = "")
+
+@Serializable
+data class TemporaryPasswordResponse(val temporaryPassword: String = "")
+
+/** Traza de la última operación ABCO; [text] es la versión legible paso a paso. */
+@Serializable
+data class TraceResponse(
+    val user: String? = null,
+    val trace: kotlinx.serialization.json.JsonElement? = null,
+    val text: String = "",
+)
 
 @Serializable
 data class CatalogItem(
@@ -103,8 +166,8 @@ data class CompareResponse(
 
 /** Modo de ocultamiento: valor que espera el servidor en el campo `mode`. */
 enum class StegoMode(val apiValue: String, val label: String) {
-    PRISMA("prisma", "PRISMA-L"),
-    CLASSIC("clasico", "LSB clásico"),
+    PRISMA("prisma", "ABCO"),
+    CLASSIC("clasico", "Esteganografía clásica"),
 }
 
 /** Resultado de /api/stego/embed: PNG + cabeceras X-Prisma-*. */
@@ -131,4 +194,6 @@ data class Session(
     val username: String,
     val role: String,
     val twoFactorEnabled: Boolean,
+    /** El administrador restableció la contraseña: solo se permite cambiarla. */
+    val mustChangePassword: Boolean = false,
 )

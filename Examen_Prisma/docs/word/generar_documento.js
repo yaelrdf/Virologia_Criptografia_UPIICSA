@@ -15,14 +15,15 @@ const traza = fs.readFileSync(path.join(ROOT, "docs", "traza_ejemplo.txt"), "utf
 const androidShots = fs.existsSync(path.join(ROOT, "docs", "capturas"))
   ? fs.readdirSync(path.join(ROOT, "docs", "capturas")).filter((f) => f.startsWith("android_")).sort() : [];
 const androidCaptions = {
-  "android_01_login.png": "App Android: inicio de sesión con acceso a la configuración del servidor.",
-  "android_02_login_2fa.png": "App Android: segundo paso del inicio de sesión (selección de la imagen-llave).",
-  "android_03_ocultar.png": "App Android: ocultar un mensaje con una imagen del catálogo.",
-  "android_04_resultado.png": "App Android: resultado con PSNR y opciones de guardar o compartir como archivo.",
-  "android_05_revelar.png": "App Android: revelar un mensaje.",
-  "android_06_cesar.png": "App Android: laboratorio César con ataque χ².",
-  "android_07_comparador.png": "App Android: comparador de algoritmos.",
-  "android_08_cuenta.png": "App Android: cuenta y activación del 2FA.",
+  "android_01_login.jpg": "App Android: inicio de sesión con el logo del panda, ajustes (tema y servidor) y «¿Olvidaste tu contraseña?».",
+  "android_02_ocultar.jpg": "App Android (vertical): ocultar un mensaje; barra de navegación inferior con el destino Admin.",
+  "android_03_ocultar_horizontal.jpg": "App Android (horizontal): riel lateral y tarjetas en dos columnas que aprovechan todo el ancho.",
+  "android_04_revelar_teclado.jpg": "App Android: en Revelar, el campo de la frase queda visible sobre el teclado.",
+  "android_05_admin.jpg": "App Android: consola de administración (usuarios con nombre ofuscado y acciones).",
+  "android_06_admin_horizontal.jpg": "App Android (horizontal): administración con usuarios y auditoría lado a lado.",
+  "android_07_temporal.jpg": "App Android: contraseña temporal generada por el administrador.",
+  "android_08_cambiar.jpg": "App Android: cambio obligatorio de contraseña al entrar con la temporal.",
+  "android_09_cuenta_oscuro.jpg": "App Android: Cuenta en tema oscuro, con selector de tema y cambio de contraseña.",
 };
 
 const body = [];
@@ -598,9 +599,11 @@ add(
     ["Cuenta", "Estado del 2FA; activar (elige imagen y confirma contraseña, guarda `llave_<usuario>.png`) o desactivar; cambiar contraseña; tema (automático, claro u oscuro); cerrar sesión."],
     ["Admin (solo administradores)", "Usuarios con nombre ofuscado y botón Revelar; restablecer contraseña (temporal con botón copiar), cambiar rol y restablecer 2FA; auditoría; traza de la última operación ABCO y mapa de diferencias."],
   ], [0.2, 0.8], "Pantallas de la app Android."),
-  P("En pantallas anchas (≥ 600 dp) la app usa un riel de navegación lateral y muestra formulario y resultado lado a lado; en teléfono, barra inferior y una columna con desplazamiento."),
+  P("**Diseño adaptativo.** Con menos de 600 dp de ancho (teléfono en vertical) la navegación va en una barra inferior; con 600 dp o más (teléfono en horizontal, tabletas) pasa a un riel lateral con desplazamiento propio, de modo que los seis destinos nunca se desbordan aunque la pantalla sea baja (en alturas menores a 480 dp solo el destino seleccionado muestra su etiqueta). El contenido decide su distribución por el ancho disponible: en pantallas anchas las tarjetas del formulario se reparten en dos columnas y, al haber resultado, se muestra formulario | resultado, hasta un ancho máximo de 1 200 dp. Los contenedores con desplazamiento reservan el espacio del teclado y llevan el campo enfocado a la vista. Los selectores segmentados usan una sola línea que reduce su tamaño si no cabe, así funcionan también con la fuente del sistema agrandada."),
+  P("**Tema.** En Cuenta (y en los ajustes del inicio de sesión) se elige **Automático**, **Claro** u **Oscuro**; Automático sigue al teléfono. La paleta es la misma que la de la web: verde de terminal como acento y carbón y gris acero como neutros, tomados del logo."),
   ...(androidShots.length
-    ? androidShots.flatMap((f) => img(SHOT(f), androidCaptions[f] || "App Android.", { maxW: 3.2, maxH: 5.6 }))
+    ? androidShots.flatMap((f) => img(SHOT(f), androidCaptions[f] || "App Android.",
+        f.includes("horizontal") ? { maxW: 6.3, maxH: 3.4 } : { maxW: 3.0, maxH: 5.4 }))
     : []),
 );
 
@@ -640,7 +643,7 @@ add(
     ["César", "CRIPTOGRAFIA → FULSWRJUDILD; HOLA → KROD; ida y vuelta con y sin Ñ; χ² encuentra la clave; ofuscación; las tildes no se filtran."],
     ["Esteganografía", "Ida y vuelta por PNG real; frase incorrecta y bit alterado → error genérico; capacidad; esteganografía clásica legible y ABCO no; χ² detecta una imagen saturada; reducción de portadoras grandes."],
   ], [0.3, 0.7], "Pruebas automatizadas."),
-  P("La app Android tiene una prueba de integración (`ApiClientIntegrationTest`, JVM) que usa el mismo cliente HTTP de la app contra el servidor en ejecución: registro, login, sesión expirada, catálogo, capacidad, ocultar y revelar en ambos modos, frase incorrecta (422 con los bytes del atacante), César, comparador y el ciclo completo del 2FA. Pasó sin fallos. Además, la app se probó en un **teléfono real con Android 11** (Samsung SM-A305G) contra el servidor en la red local (`http://dev-services.lan:5080`): conexión, registro, inicio de sesión, ocultar y guardar el PNG en Descargas, revelarlo en el teléfono y en el servidor, romper César, comparador, activar el 2FA y volver a entrar con usuario, contraseña e imagen-llave. Esa prueba detectó que la política de red solo permitía HTTP hacia el emulador; se corrigió para aceptar servidores `http://` de la red local, con un aviso de conexión sin cifrar."),
+  P("La app Android tiene una prueba de integración (`ApiClientIntegrationTest`, JVM) que usa el mismo cliente HTTP de la app contra el servidor en ejecución: registro, login, sesión expirada, catálogo, capacidad, ocultar y revelar en ambos modos, frase incorrecta (422 con los bytes del atacante), César, comparador y el ciclo completo del 2FA. Pasó sin fallos. Además, la app se probó en un **teléfono real con Android 11** (Samsung SM-A305G) contra el servidor en la red local (`http://dev-services.lan:5080`): conexión, registro, inicio de sesión, ocultar y guardar el PNG en Descargas, revelarlo en el teléfono y en el servidor, romper César, comparador, activar el 2FA y volver a entrar con usuario, contraseña e imagen-llave. Esa prueba detectó que la política de red solo permitía HTTP hacia el emulador; se corrigió para aceptar servidores `http://` de la red local, con un aviso de conexión sin cifrar. En la versión ABCO se repitió la prueba en el mismo teléfono: logo e íconos nuevos, selector de tema (claro, oscuro y automático), navegación en vertical y en horizontal (riel sin desbordes y contenido a todo el ancho), campo de la frase visible con el teclado abierto en Revelar, pantalla Admin (restablecer contraseña, contraseña temporal y cambio de rol) y el cambio obligatorio de contraseña al entrar con la temporal. Las pruebas de integración de Android también cubren el restablecimiento y el bloqueo de rutas con contraseña temporal (3 pruebas, sin fallos)."),
   P("Además se probaron de punta a punta, contra el servidor en ejecución: registro, login sin y con 2FA (llave correcta, imagen equivocada, contraseña equivocada), ocultar y revelar en ambos modos, comparador, laboratorio César, rutas de administración (un usuario normal recibe 403) y la versión Release en modo producción con variables de entorno, igual que en el contenedor."),
 );
 
