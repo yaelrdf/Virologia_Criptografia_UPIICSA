@@ -1,0 +1,41 @@
+# Build
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.binlog
+TestResults/
+
+# Server runtime data: SQLite DB, generated JWT secret and server signing key
+*.db
+*.db-shm
+*.db-wal
+src/SignalTrace.Server/data/
+secrets.json
+
+# Node
+node_modules/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/.kotlin/
+android/dist/
+*.iml
+.cxx/
+
+# APK signing (never in the repo)
+android/keystore/
+android/keystore.properties
+*.jks
+*.keystore
+
+# Python
+__pycache__/
+.venv/
+
+# Generated deliverables
+docs/word/*.docx
+docs/word/*.pdf
