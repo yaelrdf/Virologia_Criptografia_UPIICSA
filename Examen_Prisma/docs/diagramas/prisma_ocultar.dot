@@ -3,10 +3,10 @@ node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fi
 edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
   ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
   ent [label="Imagen, mensaje, frase", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; rgb [label="Normalizar a RGB 8 bits (reducir si > 1280 px)"];
-  sal [label="sal = 16 bytes aleatorios"]; der [label="Derivar claves (PBKDF2)"]; cif [label="C = CifrarPRISMA(mensaje)"];
+  sal [label="sal = 16 bytes aleatorios"]; der [label="Derivar claves (PBKDF2)"]; cif [label="C = CifrarABCO(mensaje)"];
   mac [label="T = HMAC-SHA256(k_mac, C)[0..7]"]; tr [label="Trama = longitud(4) ‖ C ‖ T"];
   q [label="¿Cabe en la imagen?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; err [label="Error: no cabe", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
-  s1 [label="Escribir la sal en los LSB de los canales 0..127"]; rec [label="R = FisherYates([128..N−1], semilla)"];
-  s2 [label="Bit j de la trama → LSB del canal R[j]"]; png [label="PNG estego (+ PSNR)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  s1 [label="Escribir la sal en el bit menos significativo\nde los canales 0..127"]; rec [label="R = FisherYates([128..N−1], semilla)"];
+  s2 [label="Bit j de la trama → bit menos significativo\ndel canal R[j]"]; png [label="PNG estego (+ PSNR)", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
   ini -> ent -> rgb -> sal -> der -> cif -> mac -> tr -> q; q -> err [label="no"]; q -> s1 [label="sí"]; s1 -> rec -> s2 -> png -> fin;
 }
