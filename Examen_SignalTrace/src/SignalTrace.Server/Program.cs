@@ -80,7 +80,8 @@ builder.Services.AddRateLimiter(o =>
         await ctx.HttpContext.Response.WriteAsJsonAsync(new ErrorResponse("rate_limited", "Demasiadas solicitudes"), ct);
     };
     static string Ip(HttpContext c) => c.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    o.AddPolicy("login", c => RateLimitPartition.GetFixedWindowLimiter(Ip(c), _ => new() { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
+    var loginPerMinute = cfg.GetValue("RateLimits:LoginPerMinute", 20);
+    o.AddPolicy("login", c => RateLimitPartition.GetFixedWindowLimiter(Ip(c), _ => new() { PermitLimit = loginPerMinute, Window = TimeSpan.FromMinutes(1) }));
     o.AddPolicy("ping", c => RateLimitPartition.GetFixedWindowLimiter(Ip(c), _ => new() { PermitLimit = 60, Window = TimeSpan.FromSeconds(10) }));
     o.AddPolicy("telemetry", c => RateLimitPartition.GetFixedWindowLimiter(c.User.DeviceId() ?? Ip(c), _ => new() { PermitLimit = 100, Window = TimeSpan.FromSeconds(10) }));
 });

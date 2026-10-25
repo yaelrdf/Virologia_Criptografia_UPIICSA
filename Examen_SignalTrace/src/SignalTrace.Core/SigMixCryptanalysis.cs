@@ -7,7 +7,28 @@ namespace SignalTrace.Core;
 /// </summary>
 public static class SigMixCryptanalysis
 {
-    public sealed record AttackResult(SigMixParams? Params, long Candidates, List<string> Log);
+    /// <summary>
+    /// <paramref name="Params"/> holds rot reduced mod n (all the known pair reveals). The real rotation byte is one of
+    /// <paramref name="RotationCandidates"/> (rot + j·n ≤ 255); for a message of another length the attacker tries them.
+    /// </summary>
+    public sealed record AttackResult(SigMixParams? Params, long Candidates, List<string> Log, int[] RotationCandidates);
+
+    /// <summary>Decrypts another ciphertext made with the same parameters, keeping the first plausible candidate.</summary>
+    public static byte[]? DecryptOther(AttackResult r, byte[] cipher, Func<byte[], bool> plausible)
+    {
+        if (r.Params is not { } p) return null;
+        var round = p.Rounds[0];
+        foreach (var rot in r.RotationCandidates)
+        {
+            try
+            {
+                var plain = SigMix.DecryptWithParams(cipher, new SigMixParams(p.Seed, [round with { Rot = rot }]));
+                if (plausible(plain)) return plain;
+            }
+            catch (System.Security.Cryptography.CryptographicException) { }
+        }
+        return null;
+    }
 
     public static AttackResult KnownPlaintextOneRound(byte[] plain, byte[] cipher)
     {
@@ -40,14 +61,16 @@ public static class SigMixCryptanalysis
                     {
                         if (!Consistent(a, y, k, m)) continue;
                         log.Add($"Rotación {rot}, seed {seed}: k·{a[1]} ≡ {(y[0] - a[0]) & 0xFF} (mod 256) → k = {k}; m·{y[0]} ≡ {(y[1] - a[1]) & 0xFF} (mod 256) → m = {m}.");
+                        var rots = Enumerable.Range(0, 256).Where(r => r % n == rot).ToArray();
                         log.Add($"Todos los {n / 2} pares cumplen K·(p+s) = c. Candidatos probados: {tried}.");
-                        return new AttackResult(new SigMixParams(seed, [new SigMixRound(k, m, rot)]), tried, log);
+                        log.Add($"La rotación real es un byte r con r mod {n} = {rot}: {rots.Length} posibles valores ({string.Join(", ", rots)}).");
+                        return new AttackResult(new SigMixParams(seed, [new SigMixRound(k, m, rot)]), tried, log, rots);
                     }
                 }
             }
         }
         log.Add("Sin solución (¿más de una ronda?).");
-        return new AttackResult(null, tried, log);
+        return new AttackResult(null, tried, log, []);
     }
 
     private static bool Consistent(int[] a, byte[] y, int k, int m)

@@ -28,6 +28,7 @@ public sealed class StFactory : WebApplicationFactory<Program>
             ["Mqtt:Enabled"] = "false",
             ["Lab:Enabled"] = "true",
             ["Lab:EnableMitmDemo"] = "true",
+            ["RateLimits:LoginPerMinute"] = "10000",
         };
         foreach (var (k, v) in _extra) settings[k] = v;
         foreach (var (k, v) in settings) builder.UseSetting(k, v);
