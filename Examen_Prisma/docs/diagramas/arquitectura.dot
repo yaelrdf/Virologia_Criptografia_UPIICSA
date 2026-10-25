@@ -5,7 +5,7 @@ edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7]; rankd
     web [label="Web responsiva\nHTML + CSS + JS"]; app [label="App Android\nKotlin + Compose"]; }
   subgraph cluster_s { label="Servidor (contenedor Docker)"; style="rounded,dashed"; color="#999999";
     api [label="ASP.NET Core 10 Web API\nauth · 2FA · stego · césar\ncomparador · admin"];
-    core [label="Prisma.Core\nCésar · LSB · PRISMA-L\nAES-GCM · métricas"];
+    core [label="Prisma.Core\nCésar · Esteganografía · ABCO\nmétricas"];
     db [label="SQLite\nusuarios · auditoría", shape=cylinder, style=filled, fillcolor="#f2f2f2", color="#666666"]; }
   web -> api [label="HTTPS + JWT", dir=both]; app -> api [label="HTTPS + JWT", dir=both];
   api -> core; api -> db;

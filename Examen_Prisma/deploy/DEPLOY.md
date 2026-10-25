@@ -1,4 +1,4 @@
-# Despliegue de PRISMA-L en la nube
+# Despliegue de ABCO en la nube
 
 El servidor es **un solo contenedor**: la API REST y la web estática salen del mismo proceso (`Prisma.Api`).
 Sirve cualquier proveedor que ejecute contenedores Docker detrás de HTTPS (Render, Railway, Fly.io, Azure App Service, Google Cloud Run, etc.).
@@ -10,7 +10,7 @@ Sirve cualquier proveedor que ejecute contenedores Docker detrás de HTTPS (Rend
 | `Jwt__Key` | Sí | Secreto para firmar las sesiones JWT; al menos 32 caracteres aleatorios. Si falta, se genera uno al arrancar y todas las sesiones se pierden en cada reinicio. |
 | `Admin__Password` | Sí, en el primer arranque | Contraseña del usuario `admin` (≥ 8). Solo se usa si todavía no existe un administrador. |
 | `Admin__Username` | No | Nombre del administrador (por defecto `admin`). |
-| `Demo__Trace` | No | `true` (por defecto) muestra la traza paso a paso de PRISMA-L en la consola admin y en el log. Ponlo en `false` fuera de la demostración. |
+| `Demo__Trace` | No | `true` (por defecto) muestra la traza paso a paso de ABCO en la consola admin y en el log. Ponlo en `false` fuera de la demostración. |
 | `Jwt__Hours` | No | Duración de la sesión en horas (por defecto 8). |
 
 Genera una clave segura con:

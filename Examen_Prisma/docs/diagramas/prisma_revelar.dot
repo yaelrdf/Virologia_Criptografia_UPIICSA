@@ -2,9 +2,9 @@ digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.
 node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
 edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
   ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; err [label="Error genérico\n(frase incorrecta, imagen alterada\no sin mensaje)", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
-  ent [label="Imagen PNG, frase", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; rgb [label="Normalizar a RGB 8 bits"]; sal [label="sal = LSB de los canales 0..127"];
+  ent [label="Imagen PNG, frase", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"]; rgb [label="Normalizar a RGB 8 bits"]; sal [label="sal = bits menos significativos\nde los canales 0..127"];
   der [label="Derivar claves con la frase"]; rec [label="R = FisherYates([128..N−1], semilla)"]; len [label="L = 4 bytes leídos por R"];
   q1 [label="¿L cabe?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; rd [label="Leer C y T por R"]; q2 [label="¿T = HMAC(k_mac, C)?\n(tiempo constante)", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
-  dec [label="P = DescifrarPRISMA(C)[0..L−1]"]; out [label="Mensaje", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  dec [label="P = DescifrarABCO(C)[0..L−1]"]; out [label="Mensaje", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
   ini -> ent -> rgb -> sal -> der -> rec -> len -> q1; q1 -> err [label="no"]; q1 -> rd [label="sí"]; rd -> q2; q2 -> err [label="no"]; q2 -> dec [label="sí"]; dec -> out -> fin;
 }
