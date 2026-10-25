@@ -44,13 +44,27 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         var period = TimeSpan.FromSeconds(1 / opt.Rate);
         if (opt.Transport == "mqtt") await ConnectMqtt(stop);
         using var timer = new PeriodicTimer(period);
+        var started = DateTime.UtcNow;
         do
         {
+            if (opt.Gaps && IsPaused((DateTime.UtcNow - started).TotalSeconds)) continue;
             try { await SendOne(stop); }
             catch (OperationCanceledException) { break; }
             catch (HttpRequestException) { Interlocked.Increment(ref stats.NetworkErrors); await Task.Delay(1000, stop).ContinueWith(_ => { }); }
         } while (await timer.WaitForNextTickAsync(stop).AsTask().ContinueWith(t => !t.IsCanceled && t.Result));
         if (_mqtt is not null) await _mqtt.DisconnectAsync();
+    }
+
+    /// <summary>
+    /// --gaps imitates a locked screen: every 40 s a 4 s pause (filled by interpolation on the server grid), and every
+    /// third cycle a 12 s pause (left as a gap). Devices are phase-shifted so they do not pause together.
+    /// </summary>
+    private bool IsPaused(double seconds)
+    {
+        var t = seconds + index * 7;
+        var cycle = (int)(t / 40);
+        var inCycle = t % 40;
+        return inCycle >= 30 && inCycle < 30 + (cycle % 3 == 2 ? 12 : 4);
     }
 
     private async Task Handshake(CancellationToken ct)
@@ -131,7 +145,7 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         var d = spd * dt;
         _lat += d * Math.Cos(_hdg * Math.PI / 180) / 111_320;
         _lon += d * Math.Sin(_hdg * Math.PI / 180) / (111_320 * Math.Cos(_lat * Math.PI / 180));
-        _bat = Math.Max(0.02, _bat - 0.0005 * dt * (1 + index % 3));
+        _bat = Math.Max(0.02, _bat - 0.00004 * dt * (1 + index % 3)); // ≈ 0.25–0.7 %/min
         _rssi = Math.Clamp(_rssi + 0.8 * Gauss() + 0.05 * (-60 - _rssi), -98, -35);
         _rtt = Math.Max(5, _rtt + 2 * Gauss() + 0.1 * (40 - _rtt));
         var anomaly = opt.Anomalies && _rnd.NextDouble() < 0.03;

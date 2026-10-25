@@ -104,10 +104,13 @@ public sealed class TelemetryPipeline(
         packet.Status = "ok";
         packet.Reason = trace.Warning;
         db.Packets.Add(packet);
-        if (device.LastSeenAt is { } prev && env.Ts > 0)
+        if (device.LastSeenAt is { } prev)
         {
+            // Nominal sampling interval (EMA of arrival deltas). Pauses (locked screen, outages) are ignored so they
+            // do not stretch the interpolation grid.
             var delta = Math.Clamp(now - prev, 50, 600_000);
-            device.IntervalMs = device.IntervalMs is { } iv ? 0.8 * iv + 0.2 * delta : delta;
+            if (device.IntervalMs is not { } iv) device.IntervalMs = delta;
+            else if (delta < 4 * iv) device.IntervalMs = 0.8 * iv + 0.2 * delta;
         }
         device.LastSeenAt = now;
         if (payload!.Bat is { } bat) device.LastBattery = bat.Lvl;

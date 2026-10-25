@@ -63,7 +63,7 @@ var stats = new Stats();
 using var cts = opt.Duration > 0 ? new CancellationTokenSource(TimeSpan.FromSeconds(opt.Duration)) : new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 var tasks = saved.Take(opt.Devices).Select((c, i) => new VirtualDevice(i, c, opt, http, pinned, stats).RunAsync(cts.Token)).ToList();
-Console.WriteLine($"{tasks.Count} dispositivos · {opt.Rate} Hz · {opt.Transport} · {opt.Suite}{(opt.Anomalies ? " · con anomalías" : "")}. Ctrl+C para terminar.");
+Console.WriteLine($"{tasks.Count} dispositivos · {opt.Rate} Hz · {opt.Transport} · {opt.Suite}{(opt.Anomalies ? " · con anomalías" : "")}{(opt.Gaps ? " · con huecos" : "")}. Ctrl+C para terminar.");
 
 var started = DateTime.UtcNow;
 var report = Task.Run(async () =>
@@ -96,6 +96,7 @@ public sealed class Options
     public int Devices { get; private set; } = 3;
     public double Rate { get; private set; } = 1;
     public bool Anomalies { get; private set; }
+    public bool Gaps { get; private set; }
     public string Transport { get; private set; } = "http";
     public int MqttPort { get; private set; } = 1883;
     public int Duration { get; private set; }
@@ -111,6 +112,7 @@ public sealed class Options
           --devices N         dispositivos virtuales (3)
           --rate HZ           paquetes por segundo por dispositivo (1)
           --anomalies         inyecta caídas de señal, picos de RTT y vibración fuerte
+          --gaps              pausas periódicas como pantalla bloqueada (4 s interpolables, 12 s hueco)
           --transport T       http | mqtt (http)
           --mqtt-port P       puerto del broker MQTT (1883)
           --suite S           aes-256-gcm | chacha20-poly1305
@@ -133,6 +135,7 @@ public sealed class Options
                 case "--devices": o.Devices = int.Parse(Next()); break;
                 case "--rate": o.Rate = double.Parse(Next(), System.Globalization.CultureInfo.InvariantCulture); break;
                 case "--anomalies": o.Anomalies = true; break;
+                case "--gaps": o.Gaps = true; break;
                 case "--transport": o.Transport = Next(); break;
                 case "--mqtt-port": o.MqttPort = int.Parse(Next()); break;
                 case "--duration": o.Duration = int.Parse(Next()); break;

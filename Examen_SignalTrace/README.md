@@ -84,6 +84,8 @@ Con la pantalla bloqueada o la pestaña oculta, el navegador detiene los sensore
 dotnet run --project src/SignalTrace.Simulator -- --user admin --password <contraseña> --fingerprint <huella> --devices 10 --rate 1 --anomalies
 ```
 
+Agrega `--gaps` para imitar pantallas bloqueadas. Hace pausas de 4 s, que el servidor interpola, y de 12 s, que quedan como hueco. Así el dashboard muestra la malla interpolada.
+
 Para enviar por el broker MQTT con ChaCha20, agrega:
 
 ```
@@ -94,6 +96,17 @@ Notas:
 
 - Los tokens de los dispositivos registrados se guardan en `sim-devices.json`, que el repositorio ignora.
 - Si la huella del servidor no coincide con `--fingerprint`, el simulador se detiene sin enviar nada.
+
+## Dashboard (`app.html`)
+
+- **Lista de dispositivos:** se actualiza en vivo por SignalR.
+- **Mosaicos:** muestran la última lectura, la señal con su pendiente por mínimos cuadrados, el RTT y el jitter, la batería con el tiempo restante estimado, la distancia (Haversine), la velocidad y la frecuencia dominante.
+- **Mapa (Leaflet + OpenStreetMap):** muestra la ruta, puntos coloreados por la intensidad de la señal y un mapa de calor de cobertura por celda de 25 m. Necesita internet para las teselas.
+- **Gráficas:** RSSI con su EMA, RTT y pérdida medidos, movimiento con SMA y EMA, espectro DFT/FFT de la vibración y batería con la proyección de la regresión.
+- **Malla temporal regular:** los puntos **interpolados** aparecen en naranja y los huecos largos como cortes.
+- **Alertas:** se reciben en vivo y se pueden marcar como atendidas.
+- **Exportaciones:** CSV, GeoJSON y KML.
+- **QR de vinculación:** sirve para la app Android.
 
 ## Pruebas
 
