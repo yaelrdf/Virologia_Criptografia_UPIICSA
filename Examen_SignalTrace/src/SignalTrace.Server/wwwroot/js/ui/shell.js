@@ -16,7 +16,9 @@ const PAGES = [
 export function applyTheme(t = store.read("st.theme") || "auto") {
   if (t === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
+  dispatchEvent(new CustomEvent("st-theme"));
 }
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => dispatchEvent(new CustomEvent("st-theme")));
 applyTheme();
 
 /** Redirects to the login when there is no valid session (or the role is insufficient). Returns the session. */

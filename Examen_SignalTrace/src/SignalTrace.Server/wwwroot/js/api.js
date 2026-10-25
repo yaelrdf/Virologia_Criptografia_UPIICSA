@@ -41,10 +41,18 @@ export async function api(path, { method = "GET", body, token, raw = false, sign
   return data;
 }
 
+/** Stacked notifications (at most 3 visible). */
 export function toast(msg, ms = 3500) {
-  const el = document.createElement("div");
-  el.className = "toast"; el.role = "status"; el.textContent = msg;
-  document.body.append(el);
+  let box = document.getElementById("toasts");
+  if (!box) {
+    box = Object.assign(document.createElement("div"), { id: "toasts", className: "toasts" });
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    document.body.append(box);
+  }
+  const el = Object.assign(document.createElement("div"), { className: "toast", textContent: msg });
+  box.append(el);
+  while (box.children.length > 3) box.firstChild.remove();
   setTimeout(() => el.remove(), ms);
 }
 
