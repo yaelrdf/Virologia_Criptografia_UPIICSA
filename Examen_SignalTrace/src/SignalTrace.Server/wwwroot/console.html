@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Consola</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    .pkts { list-style: none; margin: 0; padding: 0; max-height: 70vh; overflow: auto; font-size: .84rem; }
+    .pkts button { width: 100%; text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; min-height: 0; padding: 6px 8px; background: var(--surface); }
+    .pkts button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .pkts .sub { grid-column: 1 / -1; color: var(--muted); font-size: .76rem; }
+    .stage { border-left: 4px solid var(--border); transition: border-color .2s, background .2s; }
+    .stage.active { border-left-color: var(--accent); background: var(--surface-2); }
+    .stage h3 { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+    .stage h3 small { color: var(--muted); font-weight: 400; }
+    .hexview { font-family: var(--mono); font-size: .78rem; line-height: 1.55; word-break: break-all; background: var(--mono-bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; max-height: 220px; overflow: auto; }
+    .hexview span { padding: 0 1px; border-radius: 3px; }
+    .hexview .chg { background: color-mix(in srgb, var(--warn) 30%, transparent); }
+    .rounds { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0; }
+    .rounds button { min-height: 30px; padding: 2px 8px; font-size: .8rem; }
+    .rounds button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    .matrix { display: inline-grid; grid-template-columns: repeat(2, auto); gap: 0 10px; padding: 2px 8px; border-left: 2px solid var(--text); border-right: 2px solid var(--text); font-family: var(--mono); font-size: .85rem; vertical-align: middle; }
+    .ebar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+    .ebar > i { display: block; height: 100%; background: var(--accent); }
+    .codes { display: flex; gap: 6px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="page-head">
+      <h1>Consola de administrador</h1>
+      <div class="row">
+        <span id="live" class="badge off">Conectando…</span>
+        <button id="pause">Pausar</button>
+        <button id="play" class="primary">▶ Paso a paso</button>
+      </div>
+    </div>
+    <p class="muted small">Cada paquete que llega al servidor (HTTP o MQTT) se muestra etapa por etapa: los bytes del cable → verificación de la etiqueta AEAD → nonce y AAD → inversa de SigMix ronda por ronda → texto claro. Las llaves de sesión solo aparecen con <code>Lab:ExposeKeys=true</code>.</p>
+    <div class="codes" id="codes" style="margin-bottom:12px"></div>
+
+    <div class="grid sidebar">
+      <aside class="card">
+        <h2>Paquetes <small class="muted small" id="pcount"></small></h2>
+        <div class="row" style="margin-bottom:8px">
+          <select id="f-status" aria-label="Filtrar por estado" style="flex:1">
+            <option value="">Todos</option><option value="ok">Aceptados</option><option value="rejected">Rechazados</option>
+          </select>
+        </div>
+        <ul class="pkts" id="pkts"></ul>
+      </aside>
+
+      <section class="stack" id="detail">
+        <div class="card muted" id="empty">Esperando paquetes… Inicia el <a href="agent.html">Agente</a>, el simulador o un escenario del <a href="lab.html">Laboratorio</a>.</div>
+        <div id="view" class="stack" hidden>
+          <section class="card stage" data-stage="wire">
+            <h3>1 · Bytes en el cable <small>lo que ve Eve · <span id="w-meta"></span></small></h3>
+            <pre id="w-body" class="mono hex"></pre>
+          </section>
+          <section class="card stage" data-stage="verify">
+            <h3>2 · Verificación en el servidor <small id="v-times"></small></h3>
+            <dl class="kv" id="v-kv"></dl>
+          </section>
+          <section class="card stage" data-stage="aead">
+            <h3>3 · <span id="a-title">AES-256-GCM</span> <small id="a-ent"></small></h3>
+            <dl class="kv" id="a-kv"></dl>
+            <label style="margin-top:8px">Texto cifrado (ct) · <span id="a-len"></span></label>
+            <div class="hexview" id="a-ct"></div>
+            <div class="ebar"><i id="a-bar"></i></div>
+          </section>
+          <section class="card stage" data-stage="sigmix">
+            <h3>4 · SigMix (algoritmo propio) <small id="s-params"></small></h3>
+            <div id="s-rounds-tbl" class="table-wrap"></div>
+            <div class="rounds" id="s-rounds" role="tablist" aria-label="Etapas de SigMix"></div>
+            <div class="small muted" id="s-explain"></div>
+            <div class="hexview" id="s-hex" style="margin-top:6px"></div>
+            <div class="ebar"><i id="s-bar"></i></div>
+          </section>
+          <section class="card stage" data-stage="plain">
+            <h3>5 · Texto claro <small id="p-ent"></small></h3>
+            <pre id="p-json" class="mono"></pre>
+          </section>
+          <div class="grid two">
+            <section class="card"><h3>Entropía por etapa (bits/byte)</h3><div class="chart-box"><canvas id="c-ent"></canvas></div>
+              <p class="small muted" style="margin-top:6px">Con n bytes la entropía empírica no puede pasar de log₂ n (≈ 7.2 para 150 B); en capturas largas el texto cifrado se acerca a 8.</p></section>
+            <section class="card"><h3>Contraste: César (+3) <small class="muted" id="c-ent-caesar"></small></h3>
+              <p class="small muted">Un cifrado clásico conserva la distribución de bytes del texto claro (misma entropía) y se rompe probando 256 desplazamientos.</p>
+              <div class="hexview" id="c-hex"></div>
+            </section>
+          </div>
+          <section class="card" id="keys-card" hidden><h3>Llaves de sesión (modo clase)</h3><dl class="kv" id="keys"></dl></section>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="lib/chart/chart.umd.min.js"></script>
+  <script src="lib/signalr/signalr.min.js"></script>
+  <script type="module" src="js/console.js"></script>
+</body>
+</html>
