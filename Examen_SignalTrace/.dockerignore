@@ -1,0 +1,11 @@
+**/bin
+**/obj
+**/data
+**/node_modules
+android/
+docs/
+tests/
+reference/
+.git/
+*.db*
+sim-devices*.json
