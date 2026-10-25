@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Dashboard</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <main>
+    <div class="page-head"><h1>Dispositivos</h1></div>
+    <section class="card"><div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Última vez</th><th>Batería</th><th>Señal</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+  </main>
+  <script type="module">
+    import { api, esc, fmtTime } from "./js/api.js";
+    import { requireAuth, renderShell } from "./js/ui/shell.js";
+    requireAuth();
+    renderShell("app.html");
+    async function load() {
+      const list = await api("/api/devices");
+      document.getElementById("rows").innerHTML = list.map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.kind)}</td>
+        <td><span class="badge ${d.online ? "ok" : "off"}">${d.online ? "en línea" : "fuera de línea"}</span></td>
+        <td>${fmtTime(d.lastSeen)}</td><td>${d.battery != null ? Math.round(d.battery * 100) + " %" : "—"}</td><td>${d.lastRssi ?? "—"}</td></tr>`).join("")
+        || `<tr><td colspan="6" class="muted">Sin dispositivos. Abre el Agente o corre el simulador.</td></tr>`;
+    }
+    load(); setInterval(load, 3000);
+  </script>
+</body>
+</html>

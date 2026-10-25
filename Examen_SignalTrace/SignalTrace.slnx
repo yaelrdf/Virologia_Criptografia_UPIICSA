@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SignalTrace.Core/SignalTrace.Core.csproj" />
+    <Project Path="src/SignalTrace.Server/SignalTrace.Server.csproj" />
+    <Project Path="src/SignalTrace.Simulator/SignalTrace.Simulator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SignalTrace.Core.Tests/SignalTrace.Core.Tests.csproj" />
+    <Project Path="tests/SignalTrace.Server.Tests/SignalTrace.Server.Tests.csproj" />
+  </Folder>
+</Solution>

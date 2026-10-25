@@ -39,3 +39,4 @@ __pycache__/
 # Generated deliverables
 docs/word/*.docx
 docs/word/*.pdf
+sim-devices*.json

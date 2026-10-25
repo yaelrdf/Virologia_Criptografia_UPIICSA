@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SignalTrace.Simulator</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SignalTrace.Core\SignalTrace.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MQTTnet" />
+  </ItemGroup>
+</Project>
