@@ -1,0 +1,23 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  a [label="Temporizador (intervalo 0.5–30 s)", shape=oval, fillcolor="#DCEAF7"];
+  vis [label="¿Pestaña visible / servicio activo?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  pause [label="Estado «en pausa»\n(hueco en los datos)", fillcolor="#FFF4E5", color="#9A6700"];
+  col [label="Leer fuentes: GPS, movimiento (32 Hz → RMS, pico, ventana 64),\nbatería, red, sondeo de enlace, Wi-Fi/celular (Android)"];
+  q [label="JSON en claro → cola local (IndexedDB / archivo, máx. 500)"];
+  hs [label="¿Hay sesión?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  doHs [label="Handshake ECDH + verificación ECDSA\ncon la huella fijada"];
+  seq [label="seq ← seq + 1 (estrictamente creciente)"];
+  sm [label="sm = SigMix(json, k_sig, seq)  (3 rondas)"];
+  ae [label="nonce = iv_salt || u64(seq);  AAD = \"ST1\" || did || seq || ts\nct || tag = AES-256-GCM(k_aes, nonce, sm, AAD)"];
+  post [label="POST /api/telemetry {v, sid, did, seq, ts, ct}"];
+  res [label="Respuesta", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  ok [label="202: se quita de la cola", fillcolor="#E6F4EA", color="#1A7F37"];
+  r404 [label="404: sesión := nula"];
+  r409 [label="409: siguiente seq"];
+  r401 [label="401: detener\n(token revocado)", fillcolor="#FDECEC", color="#C62828"];
+  net [label="Sin red: backoff 1, 2, 4… 30 s\n(la cola persiste)"];
+  a -> vis; vis -> pause [label="no"]; vis -> col [label="sí"]; col -> q -> hs; hs -> doHs [label="no"]; hs -> seq [label="sí"]; doHs -> seq; seq -> sm -> ae -> post -> res;
+  res -> ok [label="202"]; res -> r404 [label="404"]; res -> r409 [label="409"]; res -> r401 [label="401"]; res -> net [label="error de red"];
+  r404 -> hs [style=dashed]; r409 -> seq [style=dashed]; ok -> hs [style=dashed, label="siguiente en cola"];
+}

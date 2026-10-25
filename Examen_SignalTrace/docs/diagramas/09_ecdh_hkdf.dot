@@ -1,0 +1,12 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  c [label="Cliente: dC aleatorio, QC = dC·G\nnonceC (16 B)"]; s [label="Servidor: dS aleatorio, QS = dS·G\nnonceS (16 B)"];
+  zc [label="z = x(dC·QS)"]; zs [label="z = x(dS·QC)"];
+  eq [label="dC·QS = dC·dS·G = dS·QC  ⇒  mismo z (32 B)", shape=note, fillcolor="#FFF4E5", color="#9A6700"];
+  prk [label="HKDF-Extract: PRK = HMAC-SHA256(salt = nonceC || nonceS, z)"];
+  exp [label="HKDF-Expand: T(1) = HMAC(PRK, info || 0x01), …"];
+  k1 [label="k_aes = HKDF(\"st1/aes-up\", 32 B)", fillcolor="#E6F4EA", color="#1A7F37"];
+  k2 [label="k_sig = HKDF(\"st1/sigmix\", 32 B)", fillcolor="#E6F4EA", color="#1A7F37"];
+  k3 [label="iv_salt = HKDF(\"st1/iv-up\", 4 B)", fillcolor="#E6F4EA", color="#1A7F37"];
+  c -> zc; s -> zs; zc -> eq; zs -> eq; eq -> prk -> exp -> {k1 k2 k3};
+}

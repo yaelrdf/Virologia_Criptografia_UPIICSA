@@ -1,0 +1,12 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  a [label="Eve conoce un par (P, C) de SigMix de 1 ronda\ncon parámetros reutilizados (sin AES-GCM)", shape=oval, fillcolor="#DCEAF7"];
+  r [label="Para cada rotación rot = 0..n−1:\ny = rotarDer(C, rot)"];
+  s [label="Para cada seed = 0..255:\nflujo s_i (LCG) ⇒ a_i = p_i + s_i mod 256"];
+  k [label="Primer par: k·a₁ ≡ y₀ − a₀ (mod 256)\nsolución si gcd(a₁, 256) | (y₀ − a₀)\n(inverso modular por Euclides extendido)"];
+  m [label="m·y₀ ≡ y₁ − a₁ (mod 256)"];
+  chk [label="¿K·(p + s) = y para TODOS los pares?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  ok [label="Parámetros hallados (≤ 256·n candidatos)\n⇒ descifra cualquier otro mensaje con los mismos parámetros", fillcolor="#FDECEC", color="#C62828"];
+  def [label="Defensa en SignalTrace: parámetros distintos por paquete (seq)\ny SigMix siempre DENTRO de AES-256-GCM:\nEve nunca ve la salida de SigMix", fillcolor="#E6F4EA", color="#1A7F37"];
+  a -> r -> s -> k -> m -> chk; chk -> ok [label="sí"]; chk -> s [label="no", style=dashed]; ok -> def [style=dotted];
+}
