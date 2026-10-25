@@ -9,7 +9,7 @@ const {
 
 const FONT = "Arial";
 const MONO = "Courier New";
-const ACCENT = "4B3FD6";
+const ACCENT = "2E7D1F";
 const CONTENT_WIDTH = 9360; // DXA: carta con márgenes de 1 in
 
 let figure = 0, table = 0, listCounter = 0;
@@ -30,7 +30,7 @@ function runs(text, base = {}) {
     if (m.index > last) out.push(new TextRun({ text: text.slice(last, m.index), ...base }));
     const t = m[0];
     if (t.startsWith("**")) out.push(new TextRun({ text: t.slice(2, -2), bold: true, ...base }));
-    else if (t.startsWith("`")) out.push(new TextRun({ text: t.slice(1, -1), font: MONO, size: 19, color: "3B2FB0", ...base }));
+    else if (t.startsWith("`")) out.push(new TextRun({ text: t.slice(1, -1), font: MONO, size: 19, color: "1F5C14", ...base }));
     else out.push(new TextRun({ text: t.slice(1, -1), italics: true, ...base }));
     last = m.index + t.length;
   }
@@ -64,11 +64,11 @@ function code(text) {
   const lines = text.replace(/\n$/, "").split("\n");
   return lines.map((line, i) => new Paragraph({
     children: [new TextRun({ text: line.length ? line : " ", font: MONO, size: 17 })],
-    shading: { type: ShadingType.CLEAR, color: "auto", fill: "F3F2FB" },
+    shading: { type: ShadingType.CLEAR, color: "auto", fill: "F2F5F3" },
     spacing: { before: i === 0 ? 80 : 0, after: i === lines.length - 1 ? 160 : 0, line: 240 },
     indent: { left: 120, right: 120 },
-    border: i === 0 ? { top: { style: BorderStyle.SINGLE, size: 4, color: "DDDBEE", space: 4 } }
-      : i === lines.length - 1 ? { bottom: { style: BorderStyle.SINGLE, size: 4, color: "DDDBEE", space: 4 } } : undefined,
+    border: i === 0 ? { top: { style: BorderStyle.SINGLE, size: 4, color: "D3DADE", space: 4 } }
+      : i === lines.length - 1 ? { bottom: { style: BorderStyle.SINGLE, size: 4, color: "D3DADE", space: 4 } } : undefined,
   }));
 }
 
@@ -86,7 +86,7 @@ function tbl(headers, rows, widths, title) {
   w[w.length - 1] += CONTENT_WIDTH - w.reduce((a, b) => a + b, 0);
   const cell = (t, i, head) => new TableCell({
     width: { size: w[i], type: WidthType.DXA },
-    shading: head ? { type: ShadingType.CLEAR, color: "auto", fill: "E7E5FA" } : undefined,
+    shading: head ? { type: ShadingType.CLEAR, color: "auto", fill: "DDEFD6" } : undefined,
     margins: { top: 50, bottom: 50, left: 90, right: 90 },
     children: String(t).split("\n").map((line) => new Paragraph({ children: runs(line, { size: 18, bold: head || undefined }), spacing: { after: 0 } })),
   });

@@ -32,10 +32,12 @@ const add = (...xs) => xs.flat().forEach((x) => body.push(x));
 // ───────────────────────── Portada ─────────────────────────
 const center = (t, size, opts = {}) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: opts.after ?? 120 }, children: [new TextRun({ text: t, size, bold: opts.bold, color: opts.color })] });
 add(
-  new Paragraph({ spacing: { before: 1200 }, children: [] }),
+  new Paragraph({ spacing: { before: 700 }, children: [] }),
   center("INSTITUTO POLITÉCNICO NACIONAL", 32, { bold: true }),
   center("Unidad Profesional Interdisciplinaria de Ingeniería y Ciencias Sociales y Administrativas (UPIICSA)", 22, { after: 600 }),
   center("Virología y Criptografía · Grupo 6NV68", 26, { after: 900 }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 },
+    children: [new D.ImageRun({ type: "png", data: fs.readFileSync(path.join(__dirname, "logo.png")), transformation: { width: 110, height: 110 } })] }),
   center("Sistema ABCO", 56, { bold: true, color: L.ACCENT, after: 200 }),
   center("Cifrado César, esteganografía y un algoritmo propio", 30, { after: 120 }),
   center("con autenticación de dos factores por imagen-llave", 30, { after: 900 }),
@@ -99,7 +101,7 @@ add(
   H2("2.2 Estructura del repositorio"),
   ...code(`Examen_Prisma/
   src/Prisma.Core/          algoritmos: Caesar, LsbClassic, PrismaKeys, PrismaCipher,
-                            Lcg64/FisherYates, PrismaStego, AesGcmRef, Metrics, Steganalysis
+                            Lcg64/FisherYates, PrismaStego, Metrics, Steganalysis
   src/Prisma.Api/           API REST + wwwroot (web) + SQLite + JWT
   tests/Prisma.Core.Tests/  pruebas xUnit y vectores del prototipo
   tools/prototipo/          prototipo de referencia en Python y generador de vectores
@@ -371,9 +373,9 @@ FUNCIÓN Ocultar(imagen, mensaje, frase):
     C ← CifrarABCO(UTF8(mensaje), claves)
     trama ← BigEndian32(|mensaje|) ‖ C ‖ HMAC_SHA256(kmac, C)[0..7]
     SI 8·|trama| > |canales| − 128 ENTONCES ERROR "no cabe"
-    PARA i ← 0 HASTA 127:  canales[i].lsb ← bit i de sal
+    PARA i ← 0 HASTA 127:  canales[i].bitMenor ← bit i de sal
     R ← FisherYates([128 .. |canales| − 1], semilla)
-    PARA j ← 0 HASTA 8·|trama| − 1:  canales[R[j]].lsb ← bit j de trama
+    PARA j ← 0 HASTA 8·|trama| − 1:  canales[R[j]].bitMenor ← bit j de trama
     DEVOLVER CodificarPNG(canales)
 
 FUNCIÓN Revelar(imagen, frase):
@@ -396,7 +398,7 @@ FUNCIÓN FisherYates(lista, semilla):
         j ← v mod (i+1);  Intercambiar(lista[i], lista[j])
     DEVOLVER lista`),
   H2("6.8 Traza real del sistema"),
-  P("Con el modo demo activo, cada operación ABCO deja una traza que se ve en la consola de administración y se imprime en la consola del servidor. Esta es la traza real de ocultar \"Hola Bob, nos vemos a las 18:00\" en `oceano.png` con la frase `girasol-azul-42` (el bloque 0 se puede verificar a mano: 72 ⊕ 239 = 167, 65·167 + 97·24 = 13 183 ≡ 127, (45·80 + 231) mod 256 = 247 y 127 + 247 ≡ 118):"),
+  P("Con el modo demo activo, cada operación ABCO deja una traza que se ve en la consola de administración y se imprime en la consola del servidor. Esta es la traza real de ocultar \"Hola Bob, nos vemos a las 18:00\" en `oceano.png` con la frase `girasol-azul-42` (el bloque 0 se puede verificar a mano: 72 ⊕ 167 = 239, 70·239 + 245·152 = 53 970 ≡ 210, (197·136 + 111) mod 256 = 23 y 210 + 23 = 233):"),
   ...code(traza),
   H2("6.9 Implementación y validación"),
   ...bullets([
@@ -584,7 +586,7 @@ add(
   ...img(SHOT("web_14_oscuro.jpg"), "Web: tema oscuro."),
   H2("11.2 App Android"),
   ...steps([
-    "Instalar `Prisma-L.apk`: en el teléfono, permitir la instalación desde el origen (navegador o administrador de archivos) y abrir el APK.",
+    "Instalar `ABCO.apk`: en el teléfono, permitir la instalación desde el origen (navegador o administrador de archivos) y abrir el APK.",
     "En la pantalla de inicio de sesión, tocar el ícono de ajustes y escribir la URL del servidor (por ejemplo `https://tu-dominio`); pulsar **Probar conexión**.",
     "Iniciar sesión. Si la cuenta tiene 2FA, la app pide elegir la imagen-llave (se puede tomar de Descargas).",
     "Usar las pestañas **Ocultar, Revelar, César, Comparador y Cuenta**. Para guardar un PNG, la app abre el selector de documentos; para enviarlo, usa **Compartir como archivo**.",
@@ -617,7 +619,7 @@ dotnet run --project src/Prisma.Api --launch-profile http # http://localhost:508
   P("En desarrollo se crea el administrador `admin` con la contraseña definida en `appsettings.Development.json`; en producción se define con la variable `Admin__Password`."),
   H2("12.2 Servidor en la nube (Docker)"),
   ...steps([
-    "Construir la imagen: `docker build -f deploy/Dockerfile -t prisma-l .`",
+    "Construir la imagen: `docker build -f deploy/Dockerfile -t abco .`",
     "Definir las variables `Jwt__Key` (≥ 32 caracteres aleatorios) y `Admin__Password`.",
     "Montar un volumen persistente en `/app/data` (base de datos y catálogo).",
     "Publicar el puerto 8080 detrás del HTTPS del proveedor (Render, Railway, Azure App Service, Cloud Run…).",
@@ -627,7 +629,7 @@ dotnet run --project src/Prisma.Api --launch-profile http # http://localhost:508
   H2("12.3 App Android"),
   ...code(`cd android
 ./gradlew :app:assembleRelease -PserverUrl=https://<dominio>   # URL por defecto del APK
-# APK firmado: app/build/outputs/apk/release/ (copiado a android/dist/Prisma-L.apk)`),
+# APK firmado: app/build/outputs/apk/release/ (se entrega como ABCO.apk)`),
   P("Sin recompilar, la URL también se cambia en la app. La app acepta servidores `http://` (por ejemplo, un equipo de la red local) y `https://`; con `http://` muestra un aviso de conexión sin cifrar. En la nube debe usarse HTTPS, porque con HTTP la contraseña y la imagen-llave viajarían sin cifrar."),
 );
 
@@ -696,7 +698,7 @@ const doc = new Document({
       { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
         run: { size: 34, bold: true, color: L.ACCENT, font: L.FONT }, paragraph: { spacing: { before: 120, after: 240 }, outlineLevel: 0 } },
       { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
-        run: { size: 27, bold: true, color: "2B2370", font: L.FONT }, paragraph: { spacing: { before: 280, after: 120 }, outlineLevel: 1, keepNext: true } },
+        run: { size: 27, bold: true, color: "1F4A14", font: L.FONT }, paragraph: { spacing: { before: 280, after: 120 }, outlineLevel: 1, keepNext: true } },
       { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true,
         run: { size: 23, bold: true, color: "3B3B55", font: L.FONT }, paragraph: { spacing: { before: 200, after: 100 }, outlineLevel: 2, keepNext: true } },
     ],
