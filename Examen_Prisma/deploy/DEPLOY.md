@@ -24,10 +24,10 @@ Monta un **volumen o disco persistente en `/app/data`**. Ahí viven `prisma.db` 
 ## 3. Construir y probar la imagen
 Desde la carpeta `Examen_Prisma`:
 ```bash
-docker build -f deploy/Dockerfile -t prisma-l .
+docker build -f deploy/Dockerfile -t abco .
 ```
 ```bash
-docker run --rm -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" -e Admin__Password='CambiaEsto#2026' -v prisma-data:/app/data prisma-l
+docker run --rm -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" -e Admin__Password='CambiaEsto#2026' -v prisma-data:/app/data abco
 ```
 Abre `http://localhost:8080` y prueba `http://localhost:8080/api/health`.
 
