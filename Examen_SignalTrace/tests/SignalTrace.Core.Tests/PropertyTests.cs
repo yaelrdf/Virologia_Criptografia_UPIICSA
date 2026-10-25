@@ -122,7 +122,9 @@ public class CryptanalysisTests
             var p2 = "{\"gps\":{\"lat\":19.5,\"lon\":-99.1}}"u8.ToArray();
             var r = SigMixCryptanalysis.KnownPlaintextOneRound(p1, SigMix.EncryptWithParams(p1, secret));
             Assert.NotNull(r.Params);
-            Assert.Equal(p2, SigMix.DecryptWithParams(SigMix.EncryptWithParams(p2, secret), r.Params!));
+            Assert.Equal(secret.Rounds[0].Rot % SigMix.Pad(p1).Length, r.Params!.Rounds[0].Rot);
+            var other = SigMixCryptanalysis.DecryptOther(r, SigMix.EncryptWithParams(p2, secret), b => b.Length > 0 && b[0] == (byte)'{' && b[^1] == (byte)'}');
+            Assert.Equal(p2, other);
         }
     }
 }

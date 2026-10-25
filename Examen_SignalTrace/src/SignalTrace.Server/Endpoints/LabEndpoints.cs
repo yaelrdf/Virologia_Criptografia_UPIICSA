@@ -34,6 +34,16 @@ public sealed record SigMixAttackRequest(string? Plaintext, string? SecondPlaint
 
 public static class LabEndpoints
 {
+    private static bool LooksLikeJson(byte[] b)
+    {
+        try
+        {
+            using var _ = System.Text.Json.JsonDocument.Parse(new UTF8Encoding(false, true).GetString(b));
+            return true;
+        }
+        catch (Exception e) when (e is System.Text.Json.JsonException or DecoderFallbackException) { return false; }
+    }
+
     public static void MapEnrollment(this WebApplication app)
     {
         app.MapPost("/api/enroll", (HttpContext ctx, ClaimsPrincipal me, EnrollmentCodes codes, ServerIdentity id, IConfiguration cfg) =>
@@ -95,11 +105,8 @@ public static class LabEndpoints
             var attack = SigMixCryptanalysis.KnownPlaintextOneRound(p1, c1);
             var ms = sw.Elapsed.TotalMilliseconds;
             string? recovered = null;
-            if (attack.Params is { } found)
-            {
-                try { recovered = Encoding.UTF8.GetString(SigMix.DecryptWithParams(c2, found)); }
-                catch (CryptographicException) { recovered = null; }
-            }
+            // The attacker keeps the rotation candidate whose output is valid UTF-8 JSON.
+            if (SigMixCryptanalysis.DecryptOther(attack, c2, LooksLikeJson) is { } plain) recovered = Encoding.UTF8.GetString(plain);
             var r0 = secret.Rounds[0];
             return Results.Ok(new
             {
@@ -110,6 +117,7 @@ public static class LabEndpoints
                 targetCipherHex = Bytes.ToHex(c2),
                 recoveredPlaintext = recovered,
                 candidates = attack.Candidates,
+                rotationCandidates = attack.RotationCandidates,
                 elapsedMs = Math.Round(ms, 2),
                 log = attack.Log,
                 note = "Con AES-256-GCM encima, Eve nunca ve la salida de SigMix: la captura solo contiene ct||tag con entropía ≈ 8 bits/byte.",
