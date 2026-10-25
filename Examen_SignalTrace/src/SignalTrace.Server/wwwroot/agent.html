@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Agente</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    #log { list-style: none; margin: 0; padding: 0; font-size: .85rem; max-height: 260px; overflow: auto; }
+    #log li { padding: 3px 0; border-bottom: 1px dashed var(--border); }
+    #log .ok { color: var(--ok); } #log .warn { color: var(--warn); } #log .bad { color: var(--bad); }
+    .sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="page-head">
+      <h1>Agente de telemetría</h1>
+      <span id="status" class="badge off" role="status" aria-live="polite">Detenido</span>
+    </div>
+    <div class="alert-box small">Este agente funciona con la pantalla encendida y la pestaña visible. Con la pantalla bloqueada el navegador detiene GPS, sensores y temporizadores: la telemetría queda <b>en pausa</b> y el dashboard muestra el hueco. Para telemetría continua usa la app Android.</div>
+
+    <div class="grid two" style="margin-top:12px">
+      <section class="card"><h2>1 · Dispositivo</h2><div id="device"></div></section>
+      <section class="card"><h2>2 · Huella del servidor</h2><div id="pin"></div></section>
+
+      <section class="card">
+        <h2>3 · Telemetría</h2>
+        <p id="ready-hint" class="alert-box small">Registra el dispositivo y fija la huella del servidor para poder iniciar.</p>
+        <div class="field">
+          <label for="interval">Intervalo de muestreo: <b id="interval-v">2 s</b></label>
+          <input id="interval" type="range" min="0.5" max="10" step="0.5">
+        </div>
+        <div class="field">
+          <label for="suite">Cifrado autenticado (AEAD)</label>
+          <select id="suite">
+            <option value="aes-256-gcm">AES-256-GCM (Web Crypto)</option>
+            <option value="chacha20-poly1305">ChaCha20-Poly1305 (@noble/ciphers)</option>
+          </select>
+        </div>
+        <fieldset class="field" style="border:1px solid var(--border);border-radius:8px">
+          <legend class="small muted">Fuentes</legend>
+          <div class="sources">
+            <label class="check"><input type="checkbox" id="src-gps"> GPS</label>
+            <label class="check"><input type="checkbox" id="src-mot"> Movimiento</label>
+            <label class="check"><input type="checkbox" id="src-bat"> Batería</label>
+            <label class="check"><input type="checkbox" id="src-net"> Red</label>
+            <label class="check"><input type="checkbox" id="src-probe"> Sondeo de enlace</label>
+            <label class="check"><input type="checkbox" id="src-sim"> <b>Simulador</b></label>
+          </div>
+        </fieldset>
+        <div class="row"><button id="start" class="primary">Iniciar</button><button id="clearq">Vaciar cola</button></div>
+      </section>
+
+      <section class="card">
+        <h2>Estado</h2>
+        <div class="stats">
+          <div class="stat"><b id="s-ok">0</b><span>aceptados (202)</span></div>
+          <div class="stat"><b id="s-rej">0</b><span>rechazados</span></div>
+          <div class="stat"><b id="s-err">0</b><span>fallos de red</span></div>
+          <div class="stat"><b id="s-queue">0</b><span>en cola local</span></div>
+        </div>
+        <dl class="kv" id="sess" style="margin-top:12px"></dl>
+        <h3 style="margin-top:12px">Fuentes</h3>
+        <dl class="kv" id="sources"></dl>
+      </section>
+
+      <section class="card"><h2>Última lectura (texto claro)</h2><pre id="payload" class="mono">—</pre></section>
+      <section class="card"><h2>En el cable (lo que ve Eve)</h2><pre id="wire" class="mono hex">—</pre></section>
+      <section class="card span-2"><h2>Bitácora</h2><ul id="log"></ul></section>
+    </div>
+  </main>
+  <script type="module" src="js/agent.js"></script>
+</body>
+</html>

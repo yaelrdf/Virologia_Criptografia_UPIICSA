@@ -103,8 +103,9 @@ app.UseStaticFiles(new StaticFileOptions
         c.Context.Response.Headers.CacheControl = "no-cache";
     },
 });
-app.UseRateLimiter();
 app.UseAuthentication();
+// After authentication so the telemetry limiter can partition by device (did claim) instead of by IP.
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapOpenApi();

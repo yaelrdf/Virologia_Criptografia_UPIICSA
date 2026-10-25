@@ -90,3 +90,13 @@ test("ChaCha20-Poly1305 suite round trip", { skip: !existsSync(chachaPath) && "n
   const bad = ct.slice(); bad[0] ^= 1;
   await assert.rejects(S.open(session, 9, 1000, bad));
 });
+
+test("noble ChaCha20-Poly1305 equals OpenSSL (same backend as .NET)", { skip: !existsSync(chachaPath) && "noble-ciphers not copied yet" }, async () => {
+  const { createCipheriv } = await import("node:crypto");
+  const { chacha20poly1305 } = await import(chachaPath.href);
+  const key = randomBytes(32), nonce = randomBytes(12), aad = utf8("ST1aad"), pt = utf8("{\"t\":1,\"src\":\"web\"}");
+  const c = createCipheriv("chacha20-poly1305", key, nonce, { authTagLength: 16 });
+  c.setAAD(aad, { plaintextLength: pt.length });
+  const ossl = Buffer.concat([c.update(pt), c.final(), c.getAuthTag()]);
+  assert.equal(toHex(chacha20poly1305(key, nonce, aad).encrypt(pt)), ossl.toString("hex"));
+});
