@@ -1,0 +1,22 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=LR; compound=true; bgcolor="white"; nodesep=0.35; ranksep=0.7;
+  node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  subgraph cluster_clients { label="Clientes (mismo protocolo ST1)"; style="rounded,dashed"; color="#8899AA";
+    web [label="Agente web / PWA\n(Web Crypto, sensores del navegador)"];
+    android [label="App Android (Kotlin)\nservicio en primer plano\nWi-Fi, celular, GPS"];
+    sim [label="Simulador CLI (.NET)\nN dispositivos, HTTP o MQTT"];
+  }
+  subgraph cluster_server { label="Servidor ASP.NET Core (.NET 10)"; style="rounded"; color="#0F6CBD";
+    api [label="Minimal API\n/api/auth · /api/handshake · /api/telemetry"];
+    mqtt [label="Broker MQTT embebido\nst/{deviceId}/up"];
+    pipe [label="Pipeline de recepción\ntoken → sesión → seq → etiqueta AEAD\n→ SigMix⁻¹ → validación", fillcolor="#FFF4E5", color="#9A6700"];
+    an [label="Analítica (métodos numéricos)\nEMA, z-score, DFT/FFT,\ninterpolación, regresión, Haversine"];
+    hub [label="SignalR /hubs/live"];
+    db [label="SQLite (EF Core)\nUsers · Devices · Readings\nPackets · Alerts", shape=cylinder];
+    keys [label="Sesiones en memoria\n(k_aes, k_sig, iv_salt)\nnunca se guardan", shape=note, fillcolor="#FDECEC", color="#C62828"];
+  }
+  ui [label="Dashboard · Consola admin\nLaboratorio · Usuarios\n(HTML + JS)"];
+  web -> api [label="POST sobre cifrado"]; android -> api [label="POST sobre cifrado"]; sim -> api; sim -> mqtt [style=dashed, label="MQTT"];
+  api -> pipe; mqtt -> pipe; pipe -> keys [dir=both, style=dotted];
+  pipe -> db; pipe -> an; an -> db; an -> hub; pipe -> hub [label="PacketTrace"]; hub -> ui [label="WebSocket"]; ui -> api [label="REST + JWT", style=dashed];
+}

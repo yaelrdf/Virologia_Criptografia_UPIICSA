@@ -1,0 +1,16 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  s [label="Entrada: C, k_sig, seq", shape=oval, fillcolor="#DCEAF7"];
+  h [label="Mismos parámetros: seed, (k, m, rot) × 3 = SHA-256(k_sig || seq || \"SigMix\")"];
+  ks [label="Regenerar las 3 filas de flujo EN ORDEN\n(ronda 1, 2, 3) con el mismo s continuo"];
+  init [label="r ← 2"];
+  rt [label="1) rotarDer(p, rot mod n)"];
+  mx [label="2) Inversa por pares (c0, c1), K⁻¹ = [[1+km, −k], [−m, 1]]:\na = ((1+k·m)·c0 − k·c1) mod 256\nb = (−m·c0 + c1) mod 256"];
+  st [label="3) Restar el flujo de la ronda r:\np[i] ← (p[i] − flujo_r[i]) mod 256"];
+  more [label="¿r > 0?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  dec [label="r ← r − 1"];
+  un [label="Quitar relleno: último byte n ∈ {1, 2}\ny los n bytes finales valen n", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  err [label="Error: relleno inválido", fillcolor="#FDECEC", color="#C62828"];
+  e [label="Salida: P", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
+  s -> h -> ks -> init -> rt -> mx -> st -> more; more -> dec [label="sí"]; dec -> rt; more -> un [label="no"]; un -> e [label="válido"]; un -> err [label="no"];
+}

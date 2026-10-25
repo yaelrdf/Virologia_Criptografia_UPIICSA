@@ -172,11 +172,11 @@ function addReading(r, live = true) {
   if (live) { redraw(); renderTiles(); }
 }
 
-/** Least-squares slope from the server (%/h) projected forward until 0 % or 30 min. */
+/** Least-squares slope from the server (%/h) projected forward until 0 % or 15 min. */
 function projectBattery(t, lvl, slopePerHour) {
   const ds = chBat.data.datasets[1];
   if (slopePerHour >= -1e-4) { ds.data = []; $("bat-note").textContent = "estable o cargando"; return; }
-  const hours = Math.min(0.5, lvl / -slopePerHour);
+  const hours = Math.min(0.25, lvl / -slopePerHour);
   ds.data = [{ x: t, y: lvl * 100 }, { x: t + hours * 3_600_000, y: Math.max(0, (lvl + slopePerHour * hours) * 100) }];
   $("bat-note").textContent = `pendiente ${(slopePerHour * 100).toFixed(1)} %/h`;
 }

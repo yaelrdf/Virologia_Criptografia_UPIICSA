@@ -1,0 +1,49 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+rankdir=TB; nodesep=0.6; ranksep=0.32; splines=false;
+hd [label="Dispositivo", shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD", width=1.8, group=D];
+hs [label="Servidor", shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD", width=1.8, group=S];
+{rank=same; hd; hs;}
+d0 [shape=point, width=0.05, group=D]; s0 [shape=point, width=0.05, group=S]; {rank=same; d0; s0;}
+hd -> d0 [arrowhead=none, style=dashed, color="#9AA7B6"]; hs -> s0 [arrowhead=none, style=dashed, color="#9AA7B6"];
+d0 -> s0 [label="1. POST /api/auth/login {usuario, contraseña}", constraint=false, color="#0F6CBD"];
+d1 [shape=point, width=0.05, group=D]; s1 [shape=point, width=0.05, group=S]; {rank=same; d1; s1;}
+d0 -> d1 [arrowhead=none, style=dashed, color="#9AA7B6"]; s0 -> s1 [arrowhead=none, style=dashed, color="#9AA7B6"];
+s1 -> d1 [label="2. JWT de usuario (PBKDF2 verificado)", constraint=false, color="#0F6CBD"];
+d2 [shape=point, width=0.05, group=D]; s2 [shape=point, width=0.05, group=S]; {rank=same; d2; s2;}
+d1 -> d2 [arrowhead=none, style=dashed, color="#9AA7B6"]; s1 -> s2 [arrowhead=none, style=dashed, color="#9AA7B6"];
+d2 -> s2 [label="3. POST /api/devices (JWT) ", constraint=false, color="#0F6CBD"];
+d3 [shape=point, width=0.05, group=D]; s3 [shape=point, width=0.05, group=S]; {rank=same; d3; s3;}
+d2 -> d3 [arrowhead=none, style=dashed, color="#9AA7B6"]; s2 -> s3 [arrowhead=none, style=dashed, color="#9AA7B6"];
+s3 -> d3 [label="4. deviceId + token de dispositivo", constraint=false, color="#0F6CBD"];
+d4 [shape=point, width=0.05, group=D]; s4 [shape=point, width=0.05, group=S]; {rank=same; d4; s4;}
+d3 -> d4 [arrowhead=none, style=dashed, color="#9AA7B6"]; s3 -> s4 [arrowhead=none, style=dashed, color="#9AA7B6"];
+d4 -> s4 [label="5. GET /api/server-key", constraint=false, color="#0F6CBD"];
+d5 [shape=point, width=0.05, group=D]; s5 [shape=point, width=0.05, group=S]; {rank=same; d5; s5;}
+d4 -> d5 [arrowhead=none, style=dashed, color="#9AA7B6"]; s4 -> s5 [arrowhead=none, style=dashed, color="#9AA7B6"];
+s5 -> d5 [label="6. llave ECDSA pública + huella SHA-256", constraint=false, color="#0F6CBD"];
+d6 [shape=point, width=0.05, group=D]; s6 [shape=point, width=0.05, group=S]; {rank=same; d6; s6;}
+d5 -> d6 [arrowhead=none, style=dashed, color="#9AA7B6"]; s5 -> s6 [arrowhead=none, style=dashed, color="#9AA7B6"];
+n6 [shape=note, style=filled, fillcolor="#FFF4E5", color="#9A6700", fontsize=10, label="7. el usuario compara y FIJA la huella;
+genera par ECDH efímero y nonceC (16 B)"]; {rank=same; d6; n6; s6;} d6 -> n6 [style=invis]; n6 -> s6 [style=invis]; d6 -> n6 [style=dotted, arrowhead=none, constraint=false];
+d7 [shape=point, width=0.05, group=D]; s7 [shape=point, width=0.05, group=S]; {rank=same; d7; s7;}
+d6 -> d7 [arrowhead=none, style=dashed, color="#9AA7B6"]; s6 -> s7 [arrowhead=none, style=dashed, color="#9AA7B6"];
+d7 -> s7 [label="8. POST /api/handshake {deviceId, pubC, nonceC, suite}", constraint=false, color="#0F6CBD"];
+d8 [shape=point, width=0.05, group=D]; s8 [shape=point, width=0.05, group=S]; {rank=same; d8; s8;}
+d7 -> d8 [arrowhead=none, style=dashed, color="#9AA7B6"]; s7 -> s8 [arrowhead=none, style=dashed, color="#9AA7B6"];
+n8 [shape=note, style=filled, fillcolor="#FFF4E5", color="#9A6700", fontsize=10, label="9. par efímero + nonceS; z = ECDH(privS, pubC);
+k_aes, k_sig, iv_salt = HKDF(z, nonceC || nonceS);
+firma = ECDSA(transcript)"]; {rank=same; d8; n8; s8;} d8 -> n8 [style=invis]; n8 -> s8 [style=invis]; s8 -> n8 [style=dotted, arrowhead=none, constraint=false];
+d9 [shape=point, width=0.05, group=D]; s9 [shape=point, width=0.05, group=S]; {rank=same; d9; s9;}
+d8 -> d9 [arrowhead=none, style=dashed, color="#9AA7B6"]; s8 -> s9 [arrowhead=none, style=dashed, color="#9AA7B6"];
+s9 -> d9 [label="10. {sessionId, pubS, nonceS, firma}", constraint=false, color="#0F6CBD"];
+d10 [shape=point, width=0.05, group=D]; s10 [shape=point, width=0.05, group=S]; {rank=same; d10; s10;}
+d9 -> d10 [arrowhead=none, style=dashed, color="#9AA7B6"]; s9 -> s10 [arrowhead=none, style=dashed, color="#9AA7B6"];
+n10 [shape=note, style=filled, fillcolor="#FFF4E5", color="#9A6700", fontsize=10, label="11. verifica la firma con la llave fijada (si falla: aborta, MITM);
+z = ECDH(privC, pubS) → mismas llaves"]; {rank=same; d10; n10; s10;} d10 -> n10 [style=invis]; n10 -> s10 [style=invis]; d10 -> n10 [style=dotted, arrowhead=none, constraint=false];
+d11 [shape=point, width=0.05, group=D]; s11 [shape=point, width=0.05, group=S]; {rank=same; d11; s11;}
+d10 -> d11 [arrowhead=none, style=dashed, color="#9AA7B6"]; s10 -> s11 [arrowhead=none, style=dashed, color="#9AA7B6"];
+d11 -> s11 [label="12. POST /api/telemetry {sid, did, seq, ts, ct = AEAD(SigMix(json))}", constraint=false, color="#0F6CBD"];
+d12 [shape=point, width=0.05, group=D]; s12 [shape=point, width=0.05, group=S]; {rank=same; d12; s12;}
+d11 -> d12 [arrowhead=none, style=dashed, color="#9AA7B6"]; s11 -> s12 [arrowhead=none, style=dashed, color="#9AA7B6"];
+s12 -> d12 [label="13. 202 {ack: seq}  ·  409 replay  ·  422 auth_failed  ·  404 unknown_session", constraint=false, color="#0F6CBD"];
+}

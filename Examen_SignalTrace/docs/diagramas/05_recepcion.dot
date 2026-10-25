@@ -1,0 +1,26 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  in [label="Sobre recibido (HTTP o MQTT)", shape=oval, fillcolor="#DCEAF7"];
+  c0 [label="¿JSON válido, v = 1, campos completos,\nct en Base64, tamaño ≤ 64 KB?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c1 [label="¿JWT de dispositivo válido, did del token = did del sobre\ny dispositivo no revocado?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c2 [label="¿Existe la sesión sid de ese dispositivo?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c3 [label="¿seq > último aceptado?\n(o libre en la ventana de 64)", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c4 [label="Recalcular nonce y AAD;\n¿etiqueta AEAD válida?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c5 [label="SigMix⁻¹ (3 rondas inversas) y quitar relleno;\n¿JSON y rangos válidos? ¿t = ts?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  acc [label="Solo ahora: último seq ← seq", fillcolor="#E6F4EA", color="#1A7F37"];
+  per [label="Guardar lectura (y paquete ok) en SQLite\n(opcional: cifrado en reposo AES-GCM)"];
+  an [label="Analítica + alertas"];
+  bc [label="SignalR: Reading, DeviceStatus, Alert,\nSpectrum, PacketTrace"];
+  out [label="202 {ack: seq}", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
+  e400 [label="400 malformed", fillcolor="#FDECEC", color="#C62828"];
+  e401 [label="401 unauthorized", fillcolor="#FDECEC", color="#C62828"];
+  e404 [label="404 unknown_session", fillcolor="#FDECEC", color="#C62828"];
+  e409 [label="409 replay", fillcolor="#FDECEC", color="#C62828"];
+  e422a [label="422 auth_failed", fillcolor="#FDECEC", color="#C62828"];
+  e422b [label="422 invalid_payload", fillcolor="#FDECEC", color="#C62828"];
+  log [label="Registrar paquete rechazado\n(sin texto claro) + PacketTrace", shape=note];
+  in -> c0; c0 -> c1 [label="sí"]; c1 -> c2 [label="sí"]; c2 -> c3 [label="sí"]; c3 -> c4 [label="sí"]; c4 -> c5 [label="sí"]; c5 -> acc [label="sí"];
+  acc -> per -> an -> bc -> out;
+  c0 -> e400 [label="no"]; c1 -> e401 [label="no"]; c2 -> e404 [label="no"]; c3 -> e409 [label="no"]; c4 -> e422a [label="no"]; c5 -> e422b [label="no"];
+  {e400 e401 e404 e409 e422a e422b} -> log [style=dashed];
+}

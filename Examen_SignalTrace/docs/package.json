@@ -1,0 +1,14 @@
+{
+  "name": "signaltrace-docs",
+  "private": true,
+  "description": "Herramientas de la documentación: capturas (puppeteer-core + Firefox del sistema) y generador del Word (docx).",
+  "type": "commonjs",
+  "scripts": {
+    "capturas": "node tools/capturas.mjs",
+    "word": "node word/generar_documento.js"
+  },
+  "dependencies": {
+    "docx": "9.10.0",
+    "puppeteer-core": "25.13.0"
+  }
+}

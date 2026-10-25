@@ -1,0 +1,14 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  s [label="Entrada: texto claro P, k_sig, seq", shape=oval, fillcolor="#DCEAF7"];
+  h [label="h = SHA-256(k_sig || u64be(seq) || \"SigMix\")\nseed = h[0];  ronda i: k = h[1+3i], m = h[2+3i], rot = h[3+3i]"];
+  pad [label="Relleno: n = 2 − (|P| mod 2); agregar n bytes de valor n"];
+  init [label="s ← seed;  r ← 0"];
+  st [label="1) Flujo LCG: para i = 0..n−1:\ns ← (5·s + 3) mod 256;  p[i] ← (p[i] + s) mod 256"];
+  mx [label="2) Mezcla matricial por pares (a, b):\na' = (a + k·b) mod 256\nb' = (m·a + (1 + k·m)·b) mod 256\nK = [[1, k], [m, 1+km]], det K = 1"];
+  rt [label="3) Permutación: p ← rotarIzq(p, rot mod n)"];
+  more [label="¿r < 2?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  inc [label="r ← r + 1  (s continúa)"];
+  e [label="Salida: C (misma longitud que P con relleno)", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
+  s -> h -> pad -> init -> st -> mx -> rt -> more; more -> inc [label="sí"]; inc -> st; more -> e [label="no"];
+}

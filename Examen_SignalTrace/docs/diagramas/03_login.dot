@@ -1,0 +1,13 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  start [label="POST /api/auth/login\n{usuario, contraseña}", shape=oval, fillcolor="#DCEAF7"];
+  thr [label="¿El usuario está en espera?\n(≥ 5 fallos: 2^(n−5) s, máx. 5 min)", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  r429 [label="429 rate_limited", fillcolor="#FDECEC", color="#C62828"];
+  find [label="Buscar usuario en SQLite\n{salt, iteraciones, hash}"];
+  pb [label="dk = PBKDF2-HMAC-SHA256(contraseña, salt, 600 000, 32 B)\n(si el usuario no existe se calcula igual con sal ficticia)"];
+  eq [label="FixedTimeEquals(dk, hash)?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  fail [label="contador de fallos + 1\n401 unauthorized", fillcolor="#FDECEC", color="#C62828"];
+  jwt [label="JWT HS256 = HMAC-SHA256(clave, header.payload)\nclaims: sub, name, role, typ=user · 60 min"];
+  ok [label="200 {token, expiresAt, role}", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
+  start -> thr; thr -> r429 [label="sí"]; thr -> find [label="no"]; find -> pb -> eq; eq -> fail [label="no"]; eq -> jwt [label="sí"]; jwt -> ok;
+}

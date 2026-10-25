@@ -1,0 +1,16 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=LR; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  r [label="Lectura descifrada\ny validada", shape=oval, fillcolor="#DCEAF7"];
+  ema [label="EMA (α = 0.3)\nRMS, RTT, RSSI"];
+  z [label="z-score móvil\n(ventana 30, |z| > 3)"];
+  th [label="Umbrales:\nbatería < 15 %, RSSI < −80 dBm,\nRTT > 500 ms, pérdida > 10 %"];
+  ls [label="Mínimos cuadrados (5 min):\npendiente RSSI (dBm/min),\nbatería (%/h) y tiempo restante"];
+  hv [label="Haversine:\ndistancia, velocidad,\nlongitud de la ruta"];
+  ft [label="DFT / FFT radix-2\n(64 muestras a 32 Hz)\nfrecuencia dominante"];
+  al [label="Alertas\n(cooldown 60 s)", fillcolor="#FFF4E5", color="#9A6700"];
+  db [label="SQLite", shape=cylinder];
+  hub [label="SignalR → dashboard"];
+  grid [label="Consulta: malla regular +\ninterpolación lineal\n(huecos ≤ 5 intervalos)\n+ SMA/EMA", fillcolor="#E6F4EA", color="#1A7F37"];
+  heat [label="Mapa de calor:\nmedia por celda de 25 m"];
+  r -> {ema z th ls hv ft}; z -> al; th -> al; ft -> al [label="banda 4–6 Hz"]; al -> db; al -> hub; {ema ls hv ft} -> hub; r -> db; db -> grid; db -> heat;
+}
