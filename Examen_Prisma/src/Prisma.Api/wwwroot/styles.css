@@ -1,36 +1,44 @@
+/* Paleta ABCO (la misma que la app Android), tomada del logo del panda:
+   verde de terminal como acento, carbón y gris acero como neutros. */
 :root {
-  --bg: #f6f6fb;
+  --bg: #f4f6f7;
   --surface: #ffffff;
-  --surface-2: #f0effa;
-  --text: #1b1a2e;
-  --muted: #5d5b75;
-  --border: #dddbee;
-  --accent: #6d5dfc;
-  --accent-2: #33c3a5;
+  --surface-2: #ebeff1;
+  --text: #1d2124;
+  --muted: #55606a;
+  --border: #d3dade;
+  --accent: #2e7d1f;
+  --accent-2: #4f646c;
   --accent-ink: #ffffff;
-  --danger: #c4314b;
-  --ok: #1d8a5f;
-  --code-bg: #f3f2fb;
-  --shadow: 0 1px 2px rgb(20 16 60 / .06), 0 4px 16px rgb(20 16 60 / .06);
+  --accent-soft: #d7f5cc;
+  --danger: #b3261e;
+  --ok: #2e7d1f;
+  --warn: #8a5a00;
+  --code-bg: #f7f9fa;
+  --topbar: #2b2d2f;
+  --topbar-ink: #f4f6f7;
+  --shadow: 0 1px 2px rgb(20 24 28 / .06), 0 4px 16px rgb(20 24 28 / .06);
   --radius: 14px;
+  color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
 }
+/* Oscuro: automático según el sistema, salvo que el usuario elija "Claro"… */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #11101c;
-    --surface: #1a192a;
-    --surface-2: #232238;
-    --text: #ecebf7;
-    --muted: #a5a3bf;
-    --border: #2f2d48;
-    --accent: #8b7eff;
-    --accent-2: #46d6b8;
-    --accent-ink: #11101c;
-    --danger: #ff6f86;
-    --ok: #4fd39a;
-    --code-bg: #15142a;
+  :root:not([data-theme="light"]) {
+    --bg: #17191a; --surface: #222527; --surface-2: #2c3033; --text: #e8ecee; --muted: #a7b1b7; --border: #3a4044;
+    --accent: #6be64a; --accent-2: #a9bec6; --accent-ink: #0b2a04; --accent-soft: #1f4a14;
+    --danger: #ff8a80; --ok: #6be64a; --warn: #f2b84b; --code-bg: #1e2123; --topbar: #111314; --topbar-ink: #e8ecee;
     --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 6px 20px rgb(0 0 0 / .25);
+    color-scheme: dark;
   }
+}
+/* …o cuando elige "Oscuro" de forma explícita. */
+:root[data-theme="dark"] {
+  --bg: #17191a; --surface: #222527; --surface-2: #2c3033; --text: #e8ecee; --muted: #a7b1b7; --border: #3a4044;
+  --accent: #6be64a; --accent-2: #a9bec6; --accent-ink: #0b2a04; --accent-soft: #1f4a14;
+  --danger: #ff8a80; --ok: #6be64a; --warn: #f2b84b; --code-bg: #1e2123; --topbar: #111314; --topbar-ink: #e8ecee;
+  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 6px 20px rgb(0 0 0 / .25);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -54,7 +62,6 @@ small, .muted { color: var(--muted); }
 .nav a:hover, .nav .link:hover { background: var(--surface-2); color: var(--text); }
 .nav a.active { background: var(--accent); color: var(--accent-ink); }
 .menu-btn { display: none; margin-left: auto; background: none; border: 1px solid var(--border); color: var(--text); border-radius: 10px; font-size: 1.2rem; padding: 4px 10px; }
-.footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 18px 16px; }
 
 /* Tarjetas y rejillas */
 .grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
@@ -83,7 +90,8 @@ button, .btn { display: inline-flex; align-items: center; justify-content: cente
   background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 650; cursor: pointer; text-decoration: none; }
 button.secondary, .btn.secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 button.danger { background: var(--danger); color: #fff; }
-button.link { background: none; border: none; padding: 6px 12px; }
+button.link { background: none; border: none; padding: 4px 8px; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+button.link:hover { color: var(--text); }
 button:disabled { opacity: .55; cursor: progress; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 
@@ -146,3 +154,43 @@ tr.best td { background: color-mix(in srgb, var(--accent-2) 14%, transparent); }
 
 /* El atributo hidden siempre gana sobre los display de arriba */
 [hidden] { display: none !important; }
+
+/* Barra superior con el color carbón del logo */
+.topbar { background: var(--topbar); border-bottom-color: transparent; }
+.brand { color: var(--topbar-ink); }
+.brand img { width: 34px; height: 34px; border-radius: 8px; background: #fff; }
+.nav a, .nav .link { color: color-mix(in srgb, var(--topbar-ink) 75%, transparent); }
+.nav a:hover, .nav .link:hover { background: rgb(255 255 255 / .1); color: var(--topbar-ink); }
+.nav a.active { background: var(--accent); color: var(--accent-ink); }
+.menu-btn { color: var(--topbar-ink); border-color: rgb(255 255 255 / .25); }
+.theme-btn { background: rgb(255 255 255 / .08); color: var(--topbar-ink); border: 1px solid rgb(255 255 255 / .2); padding: 6px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+.theme-btn:hover { background: rgb(255 255 255 / .16); }
+.theme-btn { margin-left: 8px; }
+@media (max-width: 767px) {
+  .nav { background: var(--topbar); border-bottom: 1px solid rgb(255 255 255 / .1); }
+  .theme-btn { margin-left: auto; }
+  .menu-btn { margin-left: 8px; order: 5; }
+}
+
+/* Campo de contraseña con botón Mostrar/Ocultar */
+.pw-field { position: relative; display: flex; align-items: center; }
+.pw-field input { padding-right: 92px; }
+.pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 4px 10px; font-size: .82rem;
+  background: var(--surface); color: var(--accent); border: 1px solid var(--border); border-radius: 8px; }
+.pw-toggle:hover { color: var(--text); }
+
+/* Acciones dentro de tablas: alineadas y visibles en ambos temas */
+.cell-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.cell-actions code { margin-right: 4px; }
+td .link, .cell-actions .link { padding: 2px 6px; font-size: .85rem; }
+
+/* Diálogo */
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text);
+  padding: 20px; width: min(440px, calc(100vw - 32px)); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+dialog h2 { margin-top: 0; }
+.temp-pass { font-family: ui-monospace, Consolas, monospace; font-size: 1.5rem; font-weight: 700; letter-spacing: .08em;
+  background: var(--accent-soft); color: var(--text); padding: 12px; border-radius: 10px; text-align: center; word-break: break-all; }
+.forgot { margin-top: 10px; }
+.nav[hidden] + .theme-btn { margin-left: auto; }
+.badge.neutral { background: var(--surface-2); color: var(--muted); }
