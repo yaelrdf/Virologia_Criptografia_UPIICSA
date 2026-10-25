@@ -8,6 +8,9 @@ namespace Prisma.Api.Services;
 
 public sealed class TokenService(JwtSettings settings)
 {
+    /// <summary>Marca de sesión con contraseña temporal: solo puede cambiar la contraseña.</summary>
+    public const string MustChangeClaim = "must_change_password";
+
     public string Issue(User u) => new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
     {
         Issuer = settings.Issuer,
@@ -15,7 +18,8 @@ public sealed class TokenService(JwtSettings settings)
         Subject = new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, u.Id.ToString()),
             new Claim(ClaimTypes.Name, u.Username),
-            new Claim(ClaimTypes.Role, u.Role)]),
+            new Claim(ClaimTypes.Role, u.Role),
+            .. (u.MustChangePassword ? new[] { new Claim(MustChangeClaim, "true") } : [])]),
         Expires = DateTime.UtcNow.AddHours(settings.Hours),
         SigningCredentials = new SigningCredentials(settings.SigningKey, SecurityAlgorithms.HmacSha256),
     });

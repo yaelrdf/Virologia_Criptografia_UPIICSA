@@ -5,7 +5,7 @@ using System.Text;
 namespace Prisma.Core;
 
 /// <summary>
-/// Material de clave de PRISMA-L derivado de una frase y una sal.
+/// Material de clave de ABCO derivado de una frase y una sal.
 /// A: matriz de Hill 2x2 con det impar; S0, Mult, Inc: César dinámico (LCG con Hull–Dobell);
 /// C0: bloque inicial del encadenamiento; Seed: semilla del recorrido; KMac: clave del HMAC.
 /// </summary>

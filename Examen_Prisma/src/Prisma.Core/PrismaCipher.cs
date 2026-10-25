@@ -1,7 +1,7 @@
 namespace Prisma.Core;
 
 /// <summary>
-/// Capa de cifrado de PRISMA-L sobre bloques de 2 bytes:
+/// Capa de cifrado de ABCO sobre bloques de 2 bytes:
 /// sᵢ = a·sᵢ₋₁ + c;  X = Pᵢ ⊕ Cᵢ₋₁;  Y = A·X;  Cᵢ = Y + sᵢ   (todo mod 256).
 /// </summary>
 public static class PrismaCipher

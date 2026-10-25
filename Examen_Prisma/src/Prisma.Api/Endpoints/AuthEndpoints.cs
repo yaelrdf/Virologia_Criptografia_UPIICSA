@@ -10,6 +10,7 @@ namespace Prisma.Api.Endpoints;
 
 public sealed record Credentials(string Username, string Password);
 public sealed record PasswordBody(string Password);
+public sealed record ChangePasswordBody(string CurrentPassword, string NewPassword);
 
 public static partial class AuthEndpoints
 {
@@ -94,7 +95,7 @@ public static partial class AuthEndpoints
     }
 
     private static object Session(User u, TokenService tokens) =>
-        new { token = tokens.Issue(u), username = u.Username, role = u.Role, twoFactorEnabled = u.TwoFactorEnabled };
+        new { token = tokens.Issue(u), username = u.Username, role = u.Role, twoFactorEnabled = u.TwoFactorEnabled, mustChangePassword = u.MustChangePassword };
 
     public static void MapAccount(this WebApplication app)
     {
@@ -102,10 +103,10 @@ public static partial class AuthEndpoints
 
         acc.MapGet("/me", async (HttpContext ctx, AppDb db) =>
             await db.Users.FindAsync(ctx.User.UserId()) is { } u
-                ? Results.Ok(new { u.Id, u.Username, u.Role, u.TwoFactorEnabled, u.CreatedUtc })
+                ? Results.Ok(new { u.Id, u.Username, u.Role, u.TwoFactorEnabled, u.MustChangePassword, u.CreatedUtc })
                 : Http.Error(404, "Usuario no encontrado."));
 
-        // Activa el 2FA: genera un token aleatorio de 32 B, lo oculta con PRISMA-L (frase = contraseña)
+        // Activa el 2FA: genera un token aleatorio de 32 B, lo oculta con ABCO (frase = contraseña)
         // en la imagen elegida y devuelve llave.png. Solo se guarda SHA-256(token).
         acc.MapPost("/2fa/enable", async (HttpContext ctx, AppDb db, CatalogService catalog, AuditService audit, TraceStore traces) =>
         {
@@ -130,6 +131,26 @@ public static partial class AuthEndpoints
             traces.Save(trace, user.Username, ImageIO.EncodePng(Metrics.DiffMap(cover, stego)));
             await audit.LogAsync(ctx.User, "activar 2FA", "prisma", token.Length, sw, true);
             return Results.File(ImageIO.EncodePng(stego), "image/png", $"llave_{user.Username}.png");
+        });
+
+        // Cambio de contraseña. La imagen-llave estaba cifrada con la contraseña anterior,
+        // así que si el 2FA estaba activo se desactiva y el usuario debe generar otra llave.
+        acc.MapPost("/password", async (ChangePasswordBody body, HttpContext ctx, AppDb db, AuditService audit, TokenService tokens) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var user = await db.Users.FindAsync(ctx.User.UserId());
+            if (user is null) return Http.Error(404, "Usuario no encontrado.");
+            if (!Passwords.Verify(body.CurrentPassword ?? "", user.PwdHash, user.PwdSalt)) return Http.Error(401, "La contraseña actual no es correcta.");
+            if ((body.NewPassword ?? "").Length < 8) return Http.Error(400, "La nueva contraseña debe tener al menos 8 caracteres.");
+            if (body.NewPassword == body.CurrentPassword) return Http.Error(400, "La nueva contraseña debe ser distinta de la actual.");
+            bool had2fa = user.TwoFactorEnabled;
+            (user.PwdHash, user.PwdSalt) = Passwords.Hash(body.NewPassword!);
+            user.MustChangePassword = false;
+            user.TwoFactorEnabled = false; user.KeyTokenHash = null;
+            await db.SaveChangesAsync();
+            await audit.LogAsync(ctx.User, "cambiar contraseña", null, 0, sw, true);
+            // Se entrega una sesión nueva sin la marca de contraseña temporal.
+            return Results.Ok(new { twoFactorDisabled = had2fa, session = Session(user, tokens) });
         });
 
         acc.MapPost("/2fa/disable", async (PasswordBody body, HttpContext ctx, AppDb db, AuditService audit) =>

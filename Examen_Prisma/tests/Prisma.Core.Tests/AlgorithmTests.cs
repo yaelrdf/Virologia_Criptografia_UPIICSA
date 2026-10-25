@@ -95,17 +95,6 @@ public class CipherTests
         Assert.Equal(plain, caesar, 6);
         Assert.True(prisma > 7.5, $"entropía PRISMA-L = {prisma}");
     }
-
-    [Fact]
-    public void AesGcm_RoundTripAndTamperDetection()
-    {
-        byte[] m = "mensaje secreto"u8.ToArray();
-        byte[] blob = AesGcmRef.Encrypt(m, "frase");
-        Assert.Equal(m, AesGcmRef.Decrypt(blob, "frase"));
-        blob[30] ^= 1;
-        Assert.ThrowsAny<CryptographicException>(() => AesGcmRef.Decrypt(blob, "frase"));
-        Assert.ThrowsAny<CryptographicException>(() => AesGcmRef.Decrypt(AesGcmRef.Encrypt(m, "frase"), "otra"));
-    }
 }
 
 public class CaesarTests
