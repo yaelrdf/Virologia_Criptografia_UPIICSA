@@ -4,10 +4,10 @@
 
 | Atacante | Capacidad | Defensa | Resultado |
 |---|---|---|---|
-| Eve (pasiva) | Lee el tráfico de la red o del túnel | AES-256-GCM sobre Yael Crypto March1, con llaves de sesión ECDH | Solo ve `ct` y metadatos autenticados |
-| Mallory: modifica | Altera bytes del sobre | Etiqueta GCM y AAD con did, seq y ts | `422 auth_failed`; no consume `seq` |
-| Mallory: reenvía | Reenvía paquetes válidos | `seq` estrictamente creciente por sesión (o ventana de 64) | `409 replay` |
-| Mallory: MITM | Sustituye la llave del handshake | Firma ECDSA del transcript y huella fijada | El cliente aborta |
+| Atacante pasivo | Lee el tráfico de la red o del túnel | AES-256-GCM sobre Yael Crypto March1, con llaves de sesión ECDH | Solo ve `ct` y metadatos autenticados |
+| Atacante activo: modifica | Altera bytes del sobre | Etiqueta GCM y AAD con did, seq y ts | `422 auth_failed`; no consume `seq` |
+| Atacante activo: reenvía | Reenvía paquetes válidos | `seq` estrictamente creciente por sesión (o ventana de 64) | `409 replay` |
+| Atacante activo: intermediario (MITM) | Sustituye la llave del handshake | Firma ECDSA del transcript y huella fijada | El cliente aborta |
 | Robo del token de dispositivo | Envía en nombre del dispositivo | Token revocable y ligado a un `did` | Revocación desde el dashboard |
 | Captura del QR de vinculación | Canjea el código antes que el teléfono | Código de un solo uso que expira a los 10 min; el QR solo se muestra en una sesión iniciada | Ventana corta; el dispositivo ajeno se puede revocar |
 | Certificado TLS falso (app) | Intercepta el HTTPS de la red local | La app fija el certificado por su huella SHA-256 | Conexión rechazada |
@@ -16,7 +16,7 @@
 
 ## Límites honestos
 
-- **Primera conexión (TOFU).** Si Mallory controla la red en el primer uso y el usuario no compara la huella, puede hacerse pasar por el servidor. La defensa es obtener la huella fuera de banda: en la consola del servidor o con el QR del dashboard, que ya está autenticado. Con el QR la comparación es automática.
+- **Primera conexión (TOFU).** Si un atacante controla la red en el primer uso y el usuario no compara la huella, puede hacerse pasar por el servidor. La defensa es obtener la huella fuera de banda: en la consola del servidor o con el QR del dashboard, que ya está autenticado. Con el QR la comparación es automática.
 - **Yael Crypto March1 es académico.** Es afín sobre Z₂₅₆ y se rompe con texto claro conocido (ver el capítulo de criptoanálisis). La seguridad real la da AES-GCM.
 - **HTTPS autofirmado en la red local.** El servidor sirve HTTPS en el puerto 5443 con un certificado autofirmado:
   - la app Android lo fija por su huella;

@@ -10,7 +10,7 @@ Un algoritmo inventado debe acompañarse de un análisis honesto de sus límites
 
 ## Ataque de texto claro conocido (1 ronda, parámetros reutilizados)
 
-Eve conoce un mensaje P y su cifrado C, y quiere descifrar otro mensaje C' cifrado con los mismos parámetros, como pasaría si se reutilizaran (equivalente a reutilizar un nonce).
+Un atacante conoce un mensaje P y su cifrado C, y quiere descifrar otro mensaje C' cifrado con los mismos parámetros, como pasaría si se reutilizaran (equivalente a reutilizar un nonce).
 
 ![Ataque de texto claro conocido contra Yael Crypto March1 de 1 ronda](diagramas/png/10_ataque_ycm1.png)
 
@@ -47,7 +47,7 @@ función ResolverLineal(a, b):    // todas las x en Z256 con a·x ≡ b
 ## Por qué en SignalTrace no aplica
 
 - **Parámetros distintos por paquete.** `h = SHA-256(k_sig ‖ seq ‖ "YCM1")` cambia con cada `seq`, y `seq` nunca se repite dentro de una sesión.
-- **Yael Crypto March1 nunca queda expuesto.** Eve solo ve la salida de AES-256-GCM. Para atacar Yael Crypto March1 necesitaría primero romper AES-GCM, y en ese caso Yael Crypto March1 ya no importaría.
+- **Yael Crypto March1 nunca queda expuesto.** Quien escucha la red solo ve la salida de AES-256-GCM. Para atacar Yael Crypto March1 necesitaría primero romper AES-GCM, y en ese caso Yael Crypto March1 ya no importaría.
 - **Integridad.** Modificar el paquete se detecta con la etiqueta GCM, no con Yael Crypto March1. Yael Crypto March1 no ofrece autenticidad.
 - **Lección:** la seguridad real del sistema se apoya en primitivas estándar y revisadas (AES-GCM, ECDH, ECDSA, HKDF, PBKDF2). El algoritmo propio va como capa adicional y nunca como única defensa.
 

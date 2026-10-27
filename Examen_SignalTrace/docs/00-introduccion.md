@@ -22,7 +22,7 @@ Un servidor las verifica, las analiza con métodos numéricos y muestra en vivo 
   - **SHA-256**;
   - **ChaCha20-Poly1305**.
 - Construir un sistema cliente-servidor **multiplataforma e híbrido**: web/PWA responsiva, app Android nativa y simulador, contra el mismo back-end .NET.
-- Mostrar la encriptación **paso a paso** en una consola de administrador y demostrar ataques reales (Eve y Mallory) en un laboratorio.
+- Mostrar la encriptación **paso a paso** en una consola de administrador y demostrar ataques reales (escucha pasiva, modificación, reenvío e intermediario) en un laboratorio.
 - Aplicar **álgebra lineal, matemáticas discretas y métodos numéricos** en el algoritmo y en la analítica.
 
 ## Matriz de requisitos

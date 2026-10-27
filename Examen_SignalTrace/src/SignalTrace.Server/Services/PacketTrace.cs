@@ -24,7 +24,7 @@ public sealed class PacketTraceDto
     public long Ts { get; set; }
     public string? Suite { get; set; }
     public int WireBytes { get; set; }
-    /// <summary>The HTTP body exactly as received: "what Eve sees".</summary>
+    /// <summary>The HTTP body exactly as received: what a passive listener sees.</summary>
     public string Wire { get; set; } = "";
 
     public string? PlaintextJson { get; set; }

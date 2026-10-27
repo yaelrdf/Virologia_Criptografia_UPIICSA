@@ -34,6 +34,10 @@ Abre `http://localhost:5090` e inicia sesión con `admin` / `SignalTrace2026!`.
 
 Cualquier usuario cambia **su propia contraseña** desde el menú con su nombre, arriba a la derecha → «Cambiar contraseña». Hay que escribir la actual.
 
+En un teléfono la barra superior se reduce al logo y un botón **☰**, que despliega la navegación, el tema y el menú de usuario.
+
+![Menú hamburguesa en un teléfono](capturas/web_movil_menu.png)
+
 ![Usuarios: rol editable, restablecer contraseña, identidad del servidor e historial de paquetes](capturas/web_usuarios.png)
 
 ![Cambiar la contraseña propia desde el menú de usuario](capturas/web_cambiar_contrasena.png)
@@ -60,7 +64,7 @@ El teléfono necesita **contexto seguro** (HTTPS o `localhost`) para Web Crypto 
 2. En **Sensores a exponer**, marca los sensores que se enviarán. La tabla dice cuáles ofrece este navegador y cuáles solo existen en la app Android.
 3. Pulsa **Iniciar**. La selección queda bloqueada mientras transmite. Mantén la pantalla encendida; si se bloquea, la telemetría queda en pausa.
 
-La tarjeta «En el cable» muestra exactamente lo que viaja por la red.
+La tarjeta «Transmitidos» muestra exactamente lo que viaja por la red.
 
 ![Agente web: selección de sensores antes de transmitir](capturas/web_agente_sensores.png)
 
@@ -128,7 +132,7 @@ dotnet run --project src/SignalTrace.Simulator -- --user admin --password 'Signa
 
 Muestra cada paquete que llega, aceptado o rechazado:
 
-1. Bytes en el cable.
+1. Bytes transmitidos.
 2. Verificación: resultado, motivo, `seq` y tiempos en µs.
 3. AEAD: nonce, AAD desglosado, etiqueta y texto cifrado.
 4. Yael Crypto March1: tabla de rondas con k, m, rot y la matriz K; selector de etapa con los bytes que cambian resaltados.
@@ -140,7 +144,7 @@ Incluye la entropía por etapa. **▶ Paso a paso** anima el recorrido de un paq
 
 ![Consola: Yael Crypto March1 ronda por ronda](capturas/web_consola_ycm1.png)
 
-![Consola: bytes en el cable, verificación y AES-GCM (nonce, AAD desglosado, etiqueta)](capturas/web_consola_aead.png)
+![Consola: bytes transmitidos, verificación y AES-GCM (nonce, AAD desglosado, etiqueta)](capturas/web_consola_aead.png)
 
 ![Consola: entropía por etapa](capturas/web_consola_entropia.png)
 

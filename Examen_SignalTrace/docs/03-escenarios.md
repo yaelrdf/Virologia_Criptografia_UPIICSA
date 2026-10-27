@@ -2,18 +2,18 @@
 
 Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el resultado obtenido. Los escenarios de ataque se ejecutan en vivo desde **Laboratorio → Ejecutar todos** con un dispositivo real, un handshake real y peticiones HTTP reales. Los resultados de la tabla de resumen son los de la última ejecución.
 
-**Personajes:** *Alicia* es el dispositivo legítimo, *Eve* escucha la red de forma pasiva y *Mallory* es una atacante activa que puede modificar, reenviar o interceptar mensajes.
+**Tipos de atacante:** un atacante **pasivo** solo escucha la red; uno **activo** puede además modificar, reenviar o interceptar mensajes.
 
 ![Laboratorio: los 12 escenarios con el resultado esperado](capturas/web_lab.png)
 
 | Escenario | Qué ocurre | Esperado | Obtenido |
 |---|---|---|---|
 | Normal | Handshake firmado y una lectura | 202 | 202 ✅ |
-| Eve pasiva | Captura del tráfico | El cable solo muestra `ct` con entropía cercana a 8 bits/byte | ✅ |
-| Mallory modifica (bit flip) | Invierte un bit de `ct` y reenvía | 422 auth_failed | ✅ |
-| Mallory reenvía (replay) | Reenvía un paquete válido | 409 replay | ✅ |
-| Mallory altera `ts` | Cambia el `ts` del sobre (va en el AAD) | 422 auth_failed | ✅ |
-| Mallory MITM en el handshake | El servidor firma con una llave distinta de la fijada | El cliente rechaza la firma | ✅ |
+| Escucha pasiva | Captura del tráfico | Lo transmitido solo muestra `ct` con entropía cercana a 8 bits/byte | ✅ |
+| Modificación (bit flip) | Invierte un bit de `ct` y reenvía | 422 auth_failed | ✅ |
+| Reenvío (replay) | Reenvía un paquete válido | 409 replay | ✅ |
+| Cambio de `ts` en el sobre | Cambia el `ts` del sobre (va en el AAD) | 422 auth_failed | ✅ |
+| Intermediario (MITM) en el handshake | El servidor firma con una llave distinta de la fijada | El cliente rechaza la firma | ✅ |
 | Sesión perdida | Reinicio del servidor: se borran las sesiones | 404 y luego un nuevo handshake con 202 | ✅ |
 | Contenido inválido | Paquete auténtico con humedad relativa de 140 % | 422 invalid_payload | ✅ |
 | Token ajeno o sin token | `did` distinto al del token | 401 | ✅ |
@@ -29,31 +29,31 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 
 ![Dashboard con dispositivos en vivo](capturas/web_dashboard.png)
 
-## E2 · Eve pasiva (escucha de la red o del túnel)
+## E2 · Escucha pasiva (de la red o del túnel)
 
-- **Precondiciones:** Eve ve todos los bytes que viajan entre el teléfono y el servidor.
+- **Precondiciones:** el atacante ve todos los bytes que viajan entre el teléfono y el servidor.
 - **Pasos:** se envía una lectura y se compara el texto claro con el sobre capturado.
-- **Resultado:** Eve ve `sid`, `did`, `seq` y `ts`, que son metadatos autenticados pero no cifrados. **No** ve ningún valor de los sensores: ni la orientación, ni la luz, ni la batería, ni la red. La entropía del texto cifrado se acerca a 8 bits/byte, contra unos 4.5 del JSON.
+- **Resultado:** el atacante ve `sid`, `did`, `seq` y `ts`, que son metadatos autenticados pero no cifrados. **No** ve ningún valor de los sensores: ni la orientación, ni la luz, ni la batería, ni la red. La entropía del texto cifrado se acerca a 8 bits/byte, contra unos 4.5 del JSON.
 
-![Agente web: texto claro frente a lo que viaja por el cable](capturas/web_agente.png)
+![Agente web: texto claro frente a lo transmitido](capturas/web_agente.png)
 
-## E3 · Mallory modifica un paquete
+## E3 · Modificación de un paquete
 
 - **Pasos:** se invierte un bit del texto cifrado (o de la etiqueta) y se reenvía el sobre.
-- **Resultado:** `422 auth_failed`. La etiqueta GCM no coincide y el servidor no usa ningún byte del paquete. **El número de secuencia no se consume**: el paquete original con el mismo `seq` se acepta después. El servidor actualiza `lastSeq` solo tras autenticar y validar; así Mallory no puede «quemar» números de secuencia.
+- **Resultado:** `422 auth_failed`. La etiqueta GCM no coincide y el servidor no usa ningún byte del paquete. **El número de secuencia no se consume**: el paquete original con el mismo `seq` se acepta después. El servidor actualiza `lastSeq` solo tras autenticar y validar; así un atacante no puede «quemar» números de secuencia.
 
-## E4 · Mallory reenvía (replay)
+## E4 · Reenvío (replay)
 
 - **Pasos:** se envía un paquete válido y luego exactamente el mismo.
 - **Resultado:** el primero recibe `202` y el segundo `409 replay`. Con `Telemetry:ReplayWindow=true`, una ventana deslizante de 64 bits acepta paquetes desordenados dentro de los últimos 64 `seq`, pero rechaza los duplicados. Hay prueba automática.
 
-## E5 · Mallory cambia `ts`, `seq` o `did` del sobre
+## E5 · Cambio de `ts`, `seq` o `did` del sobre
 
 - **Resultado:** `422 auth_failed`. Los tres van en el **AAD** (`"ST1" ‖ did ‖ seq ‖ ts`) y el `seq` va además en el nonce. Cambiar cualquiera rompe la etiqueta.
 
-## E6 · Mallory en medio del handshake (MITM)
+## E6 · Intermediario en el handshake (MITM)
 
-- **Precondiciones:** el cliente fijó la huella del servidor legítimo. Con `Lab:EnableMitmDemo=true` el servidor firma con otra llave, como haría Mallory.
+- **Precondiciones:** el cliente fijó la huella del servidor legítimo. Con `Lab:EnableMitmDemo=true` el servidor firma con otra llave, como haría un intermediario.
 - **Resultado:** el cliente verifica la firma ECDSA del transcript con la llave fijada, la firma falla y **aborta antes de derivar llaves**. En la app Android, si la llave del servidor cambia, la pantalla de configuración avisa del posible ataque.
 
 ## E7 · Sesión perdida (reinicio del servidor)

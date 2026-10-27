@@ -40,7 +40,7 @@
         <button id="play" class="primary">▶ Paso a paso</button>
       </div>
     </div>
-    <p class="muted small">Cada paquete que llega al servidor (HTTP o MQTT) se muestra etapa por etapa: los bytes del cable → verificación de la etiqueta AEAD → nonce y AAD → inversa de Yael Crypto March1 ronda por ronda → texto claro. Las llaves de sesión solo aparecen con <code>Lab:ExposeKeys=true</code>.</p>
+    <p class="muted small">Cada paquete que llega al servidor (HTTP o MQTT) se muestra etapa por etapa: los bytes transmitidos → verificación de la etiqueta AEAD → nonce y AAD → inversa de Yael Crypto March1 ronda por ronda → texto claro. Las llaves de sesión solo aparecen con <code>Lab:ExposeKeys=true</code>.</p>
     <div class="codes" id="codes" style="margin-bottom:12px"></div>
 
     <div class="grid sidebar">
@@ -58,7 +58,7 @@
         <div class="card muted" id="empty">Esperando paquetes… Inicia el <a href="agent.html">Agente</a>, el simulador o un escenario del <a href="lab.html">Laboratorio</a>.</div>
         <div id="view" class="stack" hidden>
           <section class="card stage" data-stage="wire">
-            <h3>1 · Bytes en el cable <small>lo que ve Eve · <span id="w-meta"></span></small></h3>
+            <h3>1 · Bytes transmitidos <small>lo que viaja por la red · <span id="w-meta"></span></small></h3>
             <pre id="w-body" class="mono hex"></pre>
           </section>
           <section class="card stage" data-stage="verify">

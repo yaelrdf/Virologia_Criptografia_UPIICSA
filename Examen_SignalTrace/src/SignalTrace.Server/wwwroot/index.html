@@ -17,14 +17,12 @@
     <section class="card login-card" aria-labelledby="t">
       <div class="row" style="margin-bottom:12px" id="logo"></div>
       <h1 id="t">Iniciar sesión</h1>
-      <p class="muted small">Sistema de rastreo de señales con telemetría cifrada (Yael Crypto March1 → AES-256-GCM, llaves por ECDH).</p>
       <div id="msg" role="alert"></div>
       <form id="f" autocomplete="on">
         <div class="field"><label for="u">Usuario</label><input id="u" name="username" autocomplete="username" required></div>
         <div class="field"><label for="p">Contraseña</label><input id="p" name="password" type="password" autocomplete="current-password" required></div>
         <button class="primary" type="submit" style="width:100%">Entrar</button>
       </form>
-      <p class="muted small" style="margin-top:12px">La contraseña se verifica en el servidor con PBKDF2-HMAC-SHA256 (600 000 iteraciones). La sesión es un JWT HS256 de 60 min.</p>
     </section>
   </main>
   <script type="module">

@@ -106,7 +106,7 @@ fun StatusScreen(state: EngineState, ready: Boolean, onStart: () -> Unit, onStop
             state.sources.forEach { (k, v) -> Kv(if (k == "bank") "Sensores físicos" else Settings.label(k), v) }
         }
         Section("Última lectura (texto claro)") { Mono(state.lastPayload ?: "—") }
-        Section("En el cable (lo que ve Eve)") { Mono(state.lastWire ?: "—") }
+        Section("Transmitidos (lo que viaja por la red)") { Mono(state.lastWire ?: "—") }
         Section("Bitácora") { state.log.forEach { Mono(it) } }
     }
 }

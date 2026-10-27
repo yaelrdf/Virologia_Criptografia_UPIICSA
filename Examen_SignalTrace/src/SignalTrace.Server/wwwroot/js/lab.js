@@ -16,7 +16,11 @@ let server = null, device = null, session = null;
 // ---------- lab device and helpers
 async function ensureDevice() {
   server ??= await api("/api/server-key");
-  device ??= store.read(LAB_KEY);
+  if (!device) {
+    // The cached lab device may have been revoked from the dashboard (or the database reset): then register a new one.
+    const cached = store.read(LAB_KEY);
+    if (cached && (await api("/api/devices")).some((d) => d.id === cached.deviceId)) device = cached;
+  }
   if (!device) {
     const r = await api("/api/devices", { method: "POST", body: { name: "Laboratorio (navegador)", kind: "web" } });
     device = { deviceId: r.deviceId, deviceToken: r.deviceToken };
@@ -56,7 +60,7 @@ const SCENARIOS = [
       log(`POST /api/telemetry → ${r.status} ${r.code}`);
       return String(r.status);
     } },
-  { id: "eve", title: "Eve pasiva", what: "Eve captura el tráfico. Comparamos lo que ve con el texto claro.", expect: "ct ≈ 8 bits/byte",
+  { id: "escucha", title: "Escucha pasiva", what: "Un atacante pasivo captura el tráfico. Comparamos lo que ve con el texto claro.", expect: "ct ≈ 8 bits/byte",
     async run(log) {
       if (!session) await handshake();
       const p = payload({ net: { type: "wifi", probe: { rtt: 32.5, jit: 2.1, loss: 0 } } });
@@ -64,8 +68,8 @@ const SCENARIOS = [
       const env = await seal(p);
       const ct = fromB64(env.ct);
       log(`Texto claro (${plain.length} B, entropía ${entropy(plain).toFixed(2)} bits/byte):`, JSON.stringify(p));
-      log(`En el cable (${ct.length} B = texto + relleno + etiqueta de 16 B, entropía ${entropy(ct).toFixed(2)} bits/byte):`, env.ct);
-      log("Eve ve did, seq y ts (metadatos autenticados en el AAD) pero no la orientación, la luz, la presión, la batería ni la red.");
+      log(`Transmitidos (${ct.length} B = texto + relleno + etiqueta de 16 B, entropía ${entropy(ct).toFixed(2)} bits/byte):`, env.ct);
+      log("Quien escucha la red ve did, seq y ts (metadatos autenticados en el AAD) pero no la orientación, la luz, la presión, la batería ni la red.");
       const r = await post(env);
       log(`El servidor lo acepta: ${r.status}`);
       // Entropy over a longer capture so the estimate is meaningful.
@@ -75,7 +79,7 @@ const SCENARIOS = [
       log(`Entropía de 8 capturas concatenadas (${caps.length} B): ${h.toFixed(2)} bits/byte (máximo teórico 8; el límite para ${caps.length} B es ≈ ${Math.log2(Math.min(256, caps.length)).toFixed(2)})`);
       return h > 7 ? "ct ≈ 8 bits/byte" : `ct ${h.toFixed(2)} bits/byte`;
     } },
-  { id: "bitflip", title: "Mallory modifica (bit flip)", what: "Mallory invierte un bit del texto cifrado y reenvía.", expect: "422 auth_failed",
+  { id: "bitflip", title: "Modificación (bit flip)", what: "Un atacante activo invierte un bit del texto cifrado y reenvía.", expect: "422 auth_failed",
     async run(log) {
       if (!session) await handshake();
       const env = await seal(payload());
@@ -87,7 +91,7 @@ const SCENARIOS = [
       log(`El original con el mismo seq sigue siendo aceptado (${ok.status}): un paquete alterado no consume números de secuencia.`);
       return `${r.status} ${r.code}`;
     } },
-  { id: "replay", title: "Mallory reenvía (replay)", what: "Mallory captura un paquete válido y lo vuelve a enviar.", expect: "409 replay",
+  { id: "replay", title: "Reenvío (replay)", what: "Un atacante activo captura un paquete válido y lo vuelve a enviar.", expect: "409 replay",
     async run(log) {
       if (!session) await handshake();
       const env = await seal(payload());
@@ -97,7 +101,7 @@ const SCENARIOS = [
       log(`Reenvío idéntico → ${b.status} ${b.code}: ${b.message}`);
       return `${b.status} ${b.code}`;
     } },
-  { id: "aad", title: "Mallory cambia ts o seq del sobre", what: "Se altera ts en el sobre sin tocar ct (ts va en el AAD).", expect: "422 auth_failed",
+  { id: "aad", title: "Cambio de ts o seq del sobre", what: "Se altera ts en el sobre sin tocar ct (ts va en el AAD).", expect: "422 auth_failed",
     async run(log) {
       if (!session) await handshake();
       const env = await seal(payload());
@@ -105,7 +109,7 @@ const SCENARIOS = [
       log(`ts retrasado 1 h → ${r.status} ${r.code}. El AAD = "ST1" ‖ did ‖ seq ‖ ts no coincide y la etiqueta GCM falla.`);
       return `${r.status} ${r.code}`;
     } },
-  { id: "mitm", title: "Mallory MITM en el handshake", what: "El servidor (con Lab:EnableMitmDemo) firma con una llave que no es la fijada.", expect: "firma rechazada",
+  { id: "mitm", title: "Intermediario (MITM) en el handshake", what: "El servidor (con Lab:EnableMitmDemo) firma con una llave que no es la fijada.", expect: "firma rechazada",
     async run(log) {
       try {
         await handshake({ mitm: true });

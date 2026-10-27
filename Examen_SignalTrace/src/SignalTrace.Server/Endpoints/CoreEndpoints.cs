@@ -191,8 +191,8 @@ public static class CoreEndpoints
             var keys = SessionKeys.Derive(z, nonceC, nonceS, suite);
             sessions.Add(sid, req.DeviceId, keys);
             var transcript = Handshake.Transcript(pubC, pubS, nonceC, nonceS, req.DeviceId, sid, suite);
-            // Lab demo: Mallory signs with a key that is not the pinned one; the client must reject it.
-            var signer = mitm == true && cfg.GetValue("Lab:Enabled", false) && cfg.GetValue("Lab:EnableMitmDemo", false) ? identity.MalloryKey : identity.Key;
+            // Lab demo: an attacker in the middle signs with a key that is not the pinned one; the client must reject it.
+            var signer = mitm == true && cfg.GetValue("Lab:Enabled", false) && cfg.GetValue("Lab:EnableMitmDemo", false) ? identity.AttackerKey : identity.Key;
             var sig = Handshake.Sign(signer, transcript);
             var exp = clock.GetUtcNow().Add(sessions.Lifetime).ToUnixTimeMilliseconds();
             return Results.Ok(new HandshakeResponse(sid, Convert.ToBase64String(pubS), Convert.ToBase64String(nonceS), Convert.ToBase64String(sig), exp, suite));

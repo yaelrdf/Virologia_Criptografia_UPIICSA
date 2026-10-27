@@ -126,7 +126,7 @@ public static class LabEndpoints
                 rotationCandidates = attack.RotationCandidates,
                 elapsedMs = Math.Round(ms, 2),
                 log = attack.Log,
-                note = "Con AES-256-GCM encima, Eve nunca ve la salida de Yael Crypto March1: la captura solo contiene ct||tag con entropía ≈ 8 bits/byte.",
+                note = "Con AES-256-GCM encima, quien escucha la red nunca ve la salida de Yael Crypto March1: la captura solo contiene ct||tag con entropía ≈ 8 bits/byte.",
             });
         });
     }

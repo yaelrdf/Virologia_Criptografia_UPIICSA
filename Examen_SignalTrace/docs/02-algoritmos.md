@@ -154,7 +154,7 @@ función Abrir(llaves, did, seq, ts, ct_tag):
 
 ## 4. ECDSA P-256 / SHA-256 (firma del handshake)
 
-**Para qué se usa.** ECDH por sí solo no autentica: Mallory podría ponerse en medio y hacer dos handshakes. Para evitarlo, el servidor tiene una **llave de largo plazo** que se genera en el primer arranque y firma el *transcript* de cada handshake. El cliente **fija** la huella SHA-256 de esa llave (*pinning*). Si la firma no se verifica con la llave fijada, aborta.
+**Para qué se usa.** ECDH por sí solo no autentica: un atacante podría ponerse en medio y hacer dos handshakes. Para evitarlo, el servidor tiene una **llave de largo plazo** que se genera en el primer arranque y firma el *transcript* de cada handshake. El cliente **fija** la huella SHA-256 de esa llave (*pinning*). Si la firma no se verifica con la llave fijada, aborta.
 
 **Idea matemática.** La llave privada es d y la pública Q = d·G. Para firmar el resumen e = SHA-256(transcript) se elige un k aleatorio y se calcula R = k·G, r = x(R) mod n y s = k⁻¹(e + r·d) mod n. Para verificar se calcula u₁ = e·s⁻¹, u₂ = r·s⁻¹ y se comprueba que x(u₁·G + u₂·Q) ≡ r. Aquí aparecen inversos modulares en 𝔽ₙ (Euclides extendido). La firma va en formato IEEE P1363 `r‖s` (64 B).
 
@@ -208,7 +208,7 @@ Se usa en tres lugares:
 
 ## 8. ChaCha20-Poly1305 (suite alternativa)
 
-Es un cifrado autenticado (RFC 8439) que sustituye a AES-GCM cuando el dispositivo no tiene AES por hardware. ChaCha20 es un generador de flujo ARX (sumas, rotaciones y XOR sobre palabras de 32 bits) y Poly1305 es un MAC polinomial módulo 2¹³⁰ − 5. Se negocia en el handshake con el campo `suite`. La suite elegida va firmada dentro del transcript, de modo que Mallory no puede forzar otra. Las llaves salen de HKDF con `info = "st1/c20-up"`.
+Es un cifrado autenticado (RFC 8439) que sustituye a AES-GCM cuando el dispositivo no tiene AES por hardware. ChaCha20 es un generador de flujo ARX (sumas, rotaciones y XOR sobre palabras de 32 bits) y Poly1305 es un MAC polinomial módulo 2¹³⁰ − 5. Se negocia en el handshake con el campo `suite`. La suite elegida va firmada dentro del transcript, de modo que un atacante no puede forzar otra. Las llaves salen de HKDF con `info = "st1/c20-up"`.
 
 - En .NET se usa `ChaCha20Poly1305`.
 - En el navegador, `@noble/ciphers` (Web Crypto no la incluye). Una prueba verifica que da los mismos bytes que OpenSSL.

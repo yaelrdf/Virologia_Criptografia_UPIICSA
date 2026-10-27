@@ -103,7 +103,12 @@ Al renombrar el algoritmo a Yael Crypto March1 cambiaron sus etiquetas (`st1/ycm
   - panel de valores en tiempo real con los seis grupos (movimiento, orientación, entorno, batería, señales y analítica), incluida la altitud barométrica (779 hPa ≈ 2 160 m);
   - historial de 15 min a 24 h con gráficas de giroscopio, orientación, luz y presión, y marcas de |z| > 3;
   - espectro, malla interpolada, QR y exportación CSV;
-  - temas claro y oscuro, escritorio y teléfono (375 px sin desplazamiento horizontal), sin errores en la consola.
+  - temas claro y oscuro, escritorio y teléfono, sin errores en la consola.
+- **Interfaz en el teléfono (375 px):**
+  - menú hamburguesa que se abre y se cierra (con Escape, al elegir un enlace o al pulsar fuera);
+  - menú de usuario desplegable hacia abajo;
+  - gráficas dentro del ancho de la pantalla;
+  - sin desplazamiento horizontal en el dashboard, el agente, la consola, el laboratorio y usuarios.
 - **Usuarios:** cambio de rol, restablecimiento con el diálogo de la contraseña de un solo uso y cambio de la contraseña propia desde el menú de usuario.
 - **Errores encontrados y corregidos durante estas pruebas:**
   - el limitador de tasa se aplicaba por IP en lugar de por dispositivo;
@@ -113,5 +118,6 @@ Al renombrar el algoritmo a Yael Crypto March1 cambiaron sus etiquetas (`st1/ycm
   - (segunda iteración) un estilo `display: grid` anulaba el atributo `hidden` del panel del dispositivo;
   - (segunda iteración) la línea del azimut daba un salto vertical al pasar de 359° a 0°; ahora se corta;
   - (segunda iteración) la tabla de sensores decía «solo en la app Android» para el magnetómetro y la luz, que sí existen en algunos navegadores.
+  - (ajustes finales) el laboratorio reutilizaba un dispositivo de laboratorio que se había revocado desde el dashboard; ahora comprueba que siga existiendo y, si no, registra uno nuevo.
 
 ![Consola: paquete rechazado por etiqueta inválida (bit flip del laboratorio)](capturas/web_consola_rechazo.png)
