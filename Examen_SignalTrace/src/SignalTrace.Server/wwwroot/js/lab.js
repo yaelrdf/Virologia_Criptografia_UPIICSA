@@ -34,7 +34,7 @@ async function handshake({ mitm = false, suite = S.SUITE_AES } = {}) {
   return { resp, session };
 }
 
-const payload = (extra = {}) => ({ t: Date.now(), src: "web", gps: { lat: 19.3955, lon: -99.0915, acc: 8 }, bat: { lvl: 0.71, chg: false }, ...extra });
+const payload = (extra = {}) => ({ t: Date.now(), src: "web", ori: { az: 182.5, pi: -3.1, ro: 1.2 }, env: { lux: 320, hpa: 779.4 }, bat: { lvl: 0.71, chg: false }, ...extra });
 
 async function post(env, token = device.deviceToken) {
   const res = await api("/api/telemetry", { method: "POST", body: typeof env === "string" ? env : JSON.stringify(env), token, raw: true });
@@ -65,7 +65,7 @@ const SCENARIOS = [
       const ct = fromB64(env.ct);
       log(`Texto claro (${plain.length} B, entropía ${entropy(plain).toFixed(2)} bits/byte):`, JSON.stringify(p));
       log(`En el cable (${ct.length} B = texto + relleno + etiqueta de 16 B, entropía ${entropy(ct).toFixed(2)} bits/byte):`, env.ct);
-      log("Eve ve did, seq y ts (metadatos autenticados en el AAD) pero no las coordenadas, la batería ni la red.");
+      log("Eve ve did, seq y ts (metadatos autenticados en el AAD) pero no la orientación, la luz, la presión, la batería ni la red.");
       const r = await post(env);
       log(`El servidor lo acepta: ${r.status}`);
       // Entropy over a longer capture so the estimate is meaningful.
@@ -129,10 +129,10 @@ const SCENARIOS = [
       log(`Nuevo handshake (llaves nuevas) y reenvío → ${b.status}`);
       return `${a.status} → ${b.status}`;
     } },
-  { id: "invalid", title: "Contenido inválido", what: "Paquete auténtico pero con latitud 200° (fuera de rango).", expect: "422 invalid_payload",
+  { id: "invalid", title: "Contenido inválido", what: "Paquete auténtico pero con humedad relativa de 140 % (fuera de rango).", expect: "422 invalid_payload",
     async run(log) {
       if (!session) await handshake();
-      const r = await post(await seal(payload({ gps: { lat: 200, lon: 0 } })));
+      const r = await post(await seal(payload({ env: { hum: 140 } })));
       log(`→ ${r.status} ${r.code}: ${r.message}. La etiqueta era válida; la validación ocurre después de descifrar.`);
       return `${r.status} ${r.code}`;
     } },
@@ -164,17 +164,6 @@ const SCENARIOS = [
       log("Segundo mensaje descifrado sin conocer la llave:", r.recoveredPlaintext);
       log(r.note);
       return r.recoveredPlaintext ? "texto recuperado" : "falló";
-    } },
-  { id: "caesar", title: "Contraste: César", what: "Cifrado clásico byte + 3 mod 256, roto por fuerza bruta.", expect: "roto en ≤ 256 intentos",
-    async run(log) {
-      const p = utf8(JSON.stringify(payload()));
-      const c = p.map((b) => (b + 3) & 255);
-      log(`Entropía: texto ${entropy(p).toFixed(2)} vs César ${entropy(c).toFixed(2)} bits/byte (idéntica: solo se renombran los símbolos).`);
-      for (let k = 0; k < 256; k++) {
-        const d = c.map((b) => (b - k + 256) & 255);
-        if (d[0] === 0x7b && d[1] === 0x22) { log(`Desplazamiento encontrado: ${k} (el JSON empieza con {").`, new TextDecoder().decode(d)); return "roto en ≤ 256 intentos"; }
-      }
-      return "no roto";
     } },
   { id: "ycm1demo", title: "Yael Crypto March1: ejemplo de mano", what: "\"Hi\" = (72, 105), seed 7, k 3, m 5, 1 ronda sin rotación.", expect: "(236, 198)",
     async run(log) {

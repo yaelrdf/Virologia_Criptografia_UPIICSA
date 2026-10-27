@@ -13,15 +13,19 @@ function themeOptions() {
 
 const timeTick = (v) => new Date(v).toLocaleTimeString("es-MX", { hour12: false });
 
-/** Line chart over time. datasets: [{ label, color, dashed?, fill? }]. */
-export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = true } = {}) {
+/**
+ * Line chart over time. datasets: [{ label, color, dashed?, fill?, marks? }]; marks draws only points (no line),
+ * used for the z-score anomalies. max: points kept per dataset by push().
+ */
+export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = true, max = 300 } = {}) {
   const { text, grid } = themeOptions();
   const chart = new Chart(canvas, {
     type: "line",
     data: {
       datasets: datasets.map((d) => ({
         label: d.label, data: [], borderColor: d.color, backgroundColor: d.color + "33", borderWidth: d.width ?? 1.6,
-        borderDash: d.dashed ? [5, 4] : undefined, pointRadius: d.points ?? 0, tension: 0.25, fill: d.fill ?? false, spanGaps: false,
+        borderDash: d.dashed ? [5, 4] : undefined, pointRadius: d.marks ? 4.5 : d.points ?? 0, tension: 0.25, fill: d.fill ?? false, spanGaps: false,
+        showLine: !d.marks, pointStyle: d.marks ? "crossRot" : "circle", pointBorderWidth: d.marks ? 2 : 1,
         parsing: false, normalized: true,
       })),
     },
@@ -37,6 +41,7 @@ export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = 
       },
     },
   });
+  chart.$max = max;
   charts.add(chart);
   return chart;
 }
@@ -60,8 +65,8 @@ export function xyChart(canvas, label, color, { xLabel = "", yLabel = "" } = {})
   return chart;
 }
 
-/** Appends a point to dataset i, keeping at most max points. */
-export function push(chart, i, x, y, max = 300) {
+/** Appends a point to dataset i, keeping at most max points (the chart's own limit by default). */
+export function push(chart, i, x, y, max = chart.$max ?? 300) {
   if (y == null || Number.isNaN(y)) return;
   const d = chart.data.datasets[i].data;
   d.push({ x, y });

@@ -6,14 +6,19 @@
   <title>SignalTrace · Agente</title>
   <meta name="theme-color" content="#0f6cbd">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <style>
     #log { list-style: none; margin: 0; padding: 0; font-size: .85rem; max-height: 260px; overflow: auto; }
     #log li { padding: 3px 0; border-bottom: 1px dashed var(--border); }
     #log .ok { color: var(--ok); } #log .warn { color: var(--warn); } #log .bad { color: var(--bad); }
-    .sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+    #sensors { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    #sensors td, #sensors th { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+    #sensors tr.group th { padding-top: 10px; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    #sensors td:first-child { width: 32px; }
+    #sensors tr.muted label { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -22,7 +27,7 @@
       <h1>Agente de telemetría</h1>
       <span id="status" class="badge off" role="status" aria-live="polite">Detenido</span>
     </div>
-    <div class="alert-box small">Este agente funciona con la pantalla encendida y la pestaña visible. Con la pantalla bloqueada el navegador detiene GPS, sensores y temporizadores: la telemetría queda <b>en pausa</b> y el dashboard muestra el hueco. Para telemetría continua usa la app Android.</div>
+    <div class="alert-box small">Este agente funciona con la pantalla encendida y la pestaña visible. Con la pantalla bloqueada el navegador detiene los sensores y los temporizadores: la telemetría queda <b>en pausa</b> y el dashboard muestra el hueco. Para telemetría continua usa la app Android.</div>
 
     <div class="grid two" style="margin-top:12px">
       <section class="card"><h2>1 · Dispositivo</h2><div id="device"></div></section>
@@ -30,7 +35,7 @@
 
       <section class="card">
         <h2>3 · Telemetría</h2>
-        <p id="ready-hint" class="alert-box small">Registra el dispositivo y fija la huella del servidor para poder iniciar.</p>
+        <p id="ready-hint" class="alert-box small">Registra o vincula el dispositivo y fija la huella del servidor para poder iniciar.</p>
         <div class="field">
           <label for="interval">Intervalo de muestreo: <b id="interval-v">2 s</b></label>
           <input id="interval" type="range" min="0.5" max="10" step="0.5">
@@ -42,17 +47,7 @@
             <option value="chacha20-poly1305">ChaCha20-Poly1305 (@noble/ciphers)</option>
           </select>
         </div>
-        <fieldset class="field" style="border:1px solid var(--border);border-radius:8px">
-          <legend class="small muted">Fuentes</legend>
-          <div class="sources">
-            <label class="check"><input type="checkbox" id="src-gps"> GPS</label>
-            <label class="check"><input type="checkbox" id="src-mot"> Movimiento</label>
-            <label class="check"><input type="checkbox" id="src-bat"> Batería</label>
-            <label class="check"><input type="checkbox" id="src-net"> Red</label>
-            <label class="check"><input type="checkbox" id="src-probe"> Sondeo de enlace</label>
-            <label class="check"><input type="checkbox" id="src-sim"> <b>Simulador</b></label>
-          </div>
-        </fieldset>
+        <label class="check" style="margin:6px 0 12px"><input type="checkbox" id="src-sim"> <b>Modo simulador</b> (datos sintéticos de todo el banco de sensores)</label>
         <div class="row"><button id="start" class="primary">Iniciar</button><button id="clearq">Vaciar cola</button></div>
       </section>
 
@@ -65,8 +60,14 @@
           <div class="stat"><b id="s-queue">0</b><span>en cola local</span></div>
         </div>
         <dl class="kv" id="sess" style="margin-top:12px"></dl>
-        <h3 style="margin-top:12px">Fuentes</h3>
-        <dl class="kv" id="sources"></dl>
+      </section>
+
+      <section class="card span-2">
+        <div class="page-head" style="margin:0"><h2>4 · Sensores a exponer</h2><span id="sensors-count" class="muted small"></span></div>
+        <p class="muted small">Elige qué sensores se envían al servidor antes de iniciar la transmisión. Solo los marcados salen del teléfono, y siempre cifrados.</p>
+        <p id="sensors-lock" class="alert-box small" hidden>La selección está bloqueada mientras se transmite. Detén el agente para cambiarla.</p>
+        <div class="row" style="margin-bottom:6px"><button id="all-on" class="small">Todos</button><button id="all-off" class="small">Ninguno</button></div>
+        <div style="overflow-x:auto"><table id="sensors"></table></div>
       </section>
 
       <section class="card"><h2>Última lectura (texto claro)</h2><pre id="payload" class="mono">—</pre></section>

@@ -102,15 +102,12 @@ function show(t) {
   // 5. plaintext
   $("p-json").textContent = t.plaintextJson ? JSON.stringify(JSON.parse(t.plaintextJson), null, 2) : "— (no expuesto o no descifrado)";
   $("p-ent").textContent = t.plaintextEntropy != null ? `entropía ${t.plaintextEntropy.toFixed(2)} bits/byte` : "";
-  // Caesar contrast
-  $("c-hex").innerHTML = t.caesarHex ? hexView(t.caesarHex, null, 160) : "—";
-  $("c-ent-caesar").textContent = t.caesarEntropy != null ? `${t.caesarEntropy.toFixed(2)} bits/byte` : "";
   // entropy chart
   const rows = [["texto claro", t.plaintextEntropy], ...(t.ycm1Stages ?? []).filter((s) => /padded|rotate/.test(s.name)).map((s) => [s.name, s.entropy]),
-    ["ct (AEAD)", t.ciphertextEntropy], ["César", t.caesarEntropy]].filter((r) => r[1] != null);
+    ["ct (AEAD)", t.ciphertextEntropy]].filter((r) => r[1] != null);
   entChart.data.labels = rows.map((r) => r[0]);
   entChart.data.datasets[0].data = rows.map((r) => r[1]);
-  entChart.data.datasets[0].backgroundColor = rows.map((r) => (r[0] === "César" ? C.SERIES.red : r[0].startsWith("ct") ? C.SERIES.green : C.SERIES.blue));
+  entChart.data.datasets[0].backgroundColor = rows.map((r) => (r[0].startsWith("ct") ? C.SERIES.green : C.SERIES.blue));
   entChart.update("none");
   // keys
   $("keys-card").hidden = !t.keys;

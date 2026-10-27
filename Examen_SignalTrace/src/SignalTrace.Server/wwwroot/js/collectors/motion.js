@@ -1,6 +1,6 @@
 // Acceleration from DeviceMotionEvent, resampled to ~32 Hz. Each interval yields mean axes, RMS and peak of the
 // dynamic part of |a|, and every N packets a window of 64 samples of |a| for the server-side DFT.
-import { round } from "./geo.js";
+import { round } from "./util.js";
 
 export const FS = 32;
 const WINDOW = 64;
