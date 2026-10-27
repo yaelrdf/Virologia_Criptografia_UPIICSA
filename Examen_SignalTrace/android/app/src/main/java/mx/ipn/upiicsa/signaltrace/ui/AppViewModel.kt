@@ -10,9 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import java.net.URI
+import java.net.URLDecoder
 import mx.ipn.upiicsa.signaltrace.crypto.Protocol
 import mx.ipn.upiicsa.signaltrace.data.Api
 import mx.ipn.upiicsa.signaltrace.data.ApiException
@@ -41,6 +40,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         it.copy(serverUrl = settings.serverUrl, pinnedFingerprint = settings.fingerprint, deviceId = settings.deviceId.takeIf { settings.isRegistered }, deviceName = settings.deviceName)
     }
 
+    private fun api() = Api(settings.serverUrl, settings.tlsPin)
+
     private fun say(msg: String, error: Boolean = false) = _setup.update { it.copy(message = msg, error = error, busy = false) }
 
     private fun io(block: suspend () -> Unit) = viewModelScope.launch {
@@ -61,7 +62,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun fetchKey() = io {
-        val key = withContext(Dispatchers.IO) { Api(settings.serverUrl).serverKey() }
+        val key = withContext(Dispatchers.IO) { api().serverKey() }
         val computed = Protocol.fingerprint(Base64.decode(key.publicKey, Base64.NO_WRAP))
         if (computed != key.fingerprint) error("La huella no corresponde a la llave recibida")
         _setup.update { it.copy(fetchedKey = key) }
@@ -82,7 +83,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun register(username: String, password: String, name: String) = io {
         settings.deviceName = name.ifBlank { android.os.Build.MODEL }
-        val api = Api(settings.serverUrl)
+        val api = api()
         val reg = withContext(Dispatchers.IO) { api.registerDevice(api.login(username, password).token, settings.deviceName) }
         settings.deviceId = reg.deviceId; settings.deviceToken = reg.deviceToken
         refresh(); say("Dispositivo registrado.")
@@ -90,27 +91,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun redeem(code: String, name: String) = io {
         settings.deviceName = name.ifBlank { android.os.Build.MODEL }
-        val reg = withContext(Dispatchers.IO) { Api(settings.serverUrl).redeemEnrollment(code.trim(), settings.deviceName) }
+        val reg = withContext(Dispatchers.IO) { api().redeemEnrollment(code.trim(), settings.deviceName) }
         settings.deviceId = reg.deviceId; settings.deviceToken = reg.deviceToken
         refresh(); say("Dispositivo vinculado con el código.")
     }
 
-    /** QR from the dashboard: {"st":1,"url":…,"fp":…,"code":…}. The key is pinned only if the server's key matches fp. */
+    /**
+     * QR from the dashboard: an ordinary URL, https://host:port/agent.html#enroll=CODE&fp=FINGERPRINT[&tls=CERTSHA256].
+     * The origin becomes the server URL; the key is pinned only if the server's key matches fp; tls pins the certificate.
+     */
     fun applyQr(text: String, name: String) = io {
-        val o = Json.parseToJsonElement(text).jsonObject
-        val url = o["url"]?.jsonPrimitive?.content ?: error("QR sin URL")
-        val fp = o["fp"]?.jsonPrimitive?.content ?: error("QR sin huella")
-        val code = o["code"]?.jsonPrimitive?.content ?: error("QR sin código")
-        setServerUrl(url)
-        val key = withContext(Dispatchers.IO) { Api(settings.serverUrl).serverKey() }
+        val uri = runCatching { URI(text.trim()) }.getOrNull() ?: error("El QR no es una URL de SignalTrace")
+        if (uri.scheme !in listOf("http", "https") || uri.host == null) error("El QR no es una URL de SignalTrace")
+        val params = (uri.rawFragment ?: "").split('&').mapNotNull { kv ->
+            kv.split('=', limit = 2).takeIf { it.size == 2 }?.let { (k, v) -> k to URLDecoder.decode(v, "UTF-8") }
+        }.toMap()
+        val code = params["enroll"] ?: error("QR sin código de vinculación")
+        val fp = params["fp"] ?: error("QR sin huella del servidor")
+        setServerUrl("${uri.scheme}://${uri.rawAuthority}")
+        settings.tlsPin = params["tls"]?.takeIf { uri.scheme == "https" }
+        val key = withContext(Dispatchers.IO) { api().serverKey() }
         val computed = Protocol.fingerprint(Base64.decode(key.publicKey, Base64.NO_WRAP))
-        if (computed != fp) error("La llave del servidor no coincide con la huella del QR: no se fija (posible MITM)")
+        if (computed != fp || key.fingerprint != fp) error("La llave del servidor no coincide con la huella del QR: no se fija (posible MITM)")
         settings.pinnedKey = key.publicKey; settings.fingerprint = fp
         _setup.update { it.copy(fetchedKey = key) }
         settings.deviceName = name.ifBlank { android.os.Build.MODEL }
-        val reg = withContext(Dispatchers.IO) { Api(settings.serverUrl).redeemEnrollment(code, settings.deviceName) }
+        val reg = withContext(Dispatchers.IO) { api().redeemEnrollment(code, settings.deviceName) }
         settings.deviceId = reg.deviceId; settings.deviceToken = reg.deviceToken
-        refresh(); say("Vinculado por QR: huella fijada y dispositivo registrado.")
+        refresh(); say("Vinculado por QR: huella fijada${if (settings.tlsPin != null) ", certificado TLS fijado" else ""} y dispositivo registrado.")
     }
 
     fun forget() { settings.forgetDevice(); refresh(); say("Dispositivo olvidado.") }

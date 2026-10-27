@@ -149,7 +149,4 @@ object Protocol {
     /** Throws [AEADBadTagException] when the packet was altered. */
     fun open(keys: SessionKeys, deviceId: String, seq: Long, ts: Long, ctAndTag: ByteArray): ByteArray =
         YaelCryptoMarch1.decrypt(aead(keys, Cipher.DECRYPT_MODE, nonce(keys.ivSalt, seq), aad(deviceId, seq, ts), ctAndTag), keys.kSig, seq)
-
-    /** HMAC-SHA256 anonymisation of identifiers (SSID, BSSID, cell id) with a key that never leaves the phone. */
-    fun anonymize(localKey: ByteArray, value: String) = "h:" + hex(hmac(localKey, value.toByteArray())).take(16)
 }

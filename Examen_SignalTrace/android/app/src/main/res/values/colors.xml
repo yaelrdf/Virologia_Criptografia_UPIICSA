@@ -3,4 +3,5 @@
     <color name="brand">#FF0F6CBD</color>
     <color name="brand_dark">#FF0F141B</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="launcher_background">#FFFFFFFF</color>
 </resources>

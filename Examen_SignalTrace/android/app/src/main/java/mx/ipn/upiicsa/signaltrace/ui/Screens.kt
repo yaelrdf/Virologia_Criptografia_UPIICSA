@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import mx.ipn.upiicsa.signaltrace.crypto.Protocol
 import mx.ipn.upiicsa.signaltrace.data.Settings
 import mx.ipn.upiicsa.signaltrace.telemetry.EngineState
+import mx.ipn.upiicsa.signaltrace.telemetry.SensorBankCollector
 
 @Composable
 fun Section(title: String, content: @Composable () -> Unit) {
@@ -100,9 +101,9 @@ fun StatusScreen(state: EngineState, ready: Boolean, onStart: () -> Unit, onStop
             Kv("Sesión", state.sessionId ?: "sin handshake"); Kv("Suite", state.suite ?: "—"); Kv("Último seq", state.seq.toString())
             OutlinedButton(onClick = onClearQueue) { Text("Vaciar cola") }
         }
-        Section("Fuentes") {
+        Section("Sensores") {
             if (state.sources.isEmpty()) Text("Se muestran al iniciar.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            state.sources.forEach { (k, v) -> Kv(Settings.SOURCES.firstOrNull { it.first == k }?.second ?: k, v) }
+            state.sources.forEach { (k, v) -> Kv(if (k == "bank") "Sensores físicos" else Settings.label(k), v) }
         }
         Section("Última lectura (texto claro)") { Mono(state.lastPayload ?: "—") }
         Section("En el cable (lo que ve Eve)") { Mono(state.lastWire ?: "—") }
@@ -125,7 +126,7 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
             Card { Text(it, Modifier.padding(12.dp), color = if (setup.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) }
         }
         Section("Vincular con QR (recomendado)") {
-            Text("En el dashboard web pulsa «Vincular teléfono (QR)». El QR trae la URL, la huella de la llave del servidor y un código de un solo uso.",
+            Text("En el dashboard web pulsa «Vincular teléfono (QR)». El QR es un enlace normal con la URL del servidor, la huella de su llave, la huella de su certificado TLS y un código de un solo uso.",
                 style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(name, { name = it }, label = { Text("Nombre del dispositivo") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Button(onClick = { onScanQr(name) }, enabled = !setup.busy, modifier = Modifier.fillMaxWidth()) { Text("Escanear QR") }
@@ -133,7 +134,7 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
         Section("1 · Servidor") {
             OutlinedTextField(url, { url = it }, label = { Text("URL del servidor") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-            if (url.startsWith("http://")) Text("HTTP sin TLS: los paquetes van cifrados de extremo a extremo, pero el token del dispositivo viaja en claro. Usa HTTPS (túnel) fuera del laboratorio.",
+            if (url.startsWith("http://")) Text("HTTP sin TLS: los paquetes van cifrados de extremo a extremo, pero el token del dispositivo viaja en claro. Usa HTTPS: el QR de vinculación ya apunta al puerto HTTPS del servidor y fija su certificado.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
             Button(onClick = { vm.setServerUrl(url); vm.fetchKey() }, enabled = !setup.busy) { Text("Obtener llave del servidor") }
             setup.fetchedKey?.let { key ->
@@ -173,28 +174,38 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
 fun SettingsScreen(settings: Settings, running: Boolean) {
     val ctx = LocalContext.current
     var interval by remember { mutableFloatStateOf(settings.intervalSec) }
-    var anon by remember { mutableStateOf(settings.anonymize) }
     var suite by remember { mutableStateOf(settings.suite) }
-    val sources = remember { Settings.SOURCES.associate { it.first to mutableStateOf(settings.source(it.first)) } }
+    val available = remember { SensorBankCollector.availability(ctx) }
+    val sources = remember { Settings.SOURCES.associate { it.id to mutableStateOf(settings.source(it.id)) } }
+    fun setAll(on: Boolean) = Settings.SOURCES.forEach { sources[it.id]!!.value = on; settings.setSource(it.id, on) }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (running) Card { Text("Los cambios se aplican al reiniciar la telemetría.", Modifier.padding(12.dp)) }
         Section("Intervalo de muestreo: ${"%.0f".format(interval)} s") {
             Slider(interval, { interval = it }, valueRange = 1f..30f, steps = 28, onValueChangeFinished = { settings.intervalSec = interval })
         }
-        Section("Fuentes") {
-            Settings.SOURCES.forEach { (key, label) ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, Modifier.weight(1f))
-                    Switch(sources[key]!!.value, { sources[key]!!.value = it; settings.setSource(key, it) })
+        Section("Sensores expuestos al servidor") {
+            Text("Por defecto se expone todo el banco de sensores. Solo los activados salen del teléfono, y siempre cifrados.",
+                style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { setAll(true) }) { Text("Todos") }
+                OutlinedButton(onClick = { setAll(false) }) { Text("Ninguno") }
+            }
+            Settings.SOURCES.groupBy { it.group }.forEach { (group, items) ->
+                Text(group.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp))
+                items.forEach { src ->
+                    val present = available[src.id] ?: true
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(src.label)
+                            if (!present) Text("No disponible en este dispositivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(sources[src.id]!!.value && present, { sources[src.id]!!.value = it; settings.setSource(src.id, it) }, enabled = present)
+                    }
                 }
             }
-            Text("Si niegas un permiso solo se desactiva esa fuente.", style = MaterialTheme.typography.bodySmall)
-        }
-        Section("Privacidad") {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Anonimizar SSID, BSSID e identificador de celda (HMAC-SHA256 con llave local)", Modifier.weight(1f))
-                Switch(anon, { anon = it; settings.anonymize = it })
-            }
+            Text("Si niegas un permiso (actividad física para el podómetro) solo se desactiva ese sensor. La app no usa la ubicación.",
+                style = MaterialTheme.typography.bodySmall)
         }
         Section("Cifrado autenticado") {
             listOf(Protocol.SUITE_AES to "AES-256-GCM", Protocol.SUITE_CHACHA to "ChaCha20-Poly1305").forEach { (id, label) ->

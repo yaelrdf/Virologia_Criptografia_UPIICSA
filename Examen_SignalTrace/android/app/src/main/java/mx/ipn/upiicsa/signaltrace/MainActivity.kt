@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private var pendingQrName = ""
 
-    // Runtime permissions (PLAN §13.4): each denied permission only disables its source; the service starts anyway.
+    // Runtime permissions: each denied permission only disables its sensor; the service starts anyway. No location.
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         TelemetryService.start(this)
     }
@@ -89,8 +89,10 @@ class MainActivity : ComponentActivity() {
 
     /** Started only from the visible UI (Android 12+ forbids starting foreground services from the background). */
     private fun startTelemetry() {
-        val wanted = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.READ_PHONE_STATE)
+        val wanted = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 29 && vm.settings.source("stp")) wanted += Manifest.permission.ACTIVITY_RECOGNITION
         if (Build.VERSION.SDK_INT >= 33) wanted += Manifest.permission.POST_NOTIFICATIONS
+        if (wanted.isEmpty()) { TelemetryService.start(this); return }
         permissions.launch(wanted.toTypedArray())
     }
 }

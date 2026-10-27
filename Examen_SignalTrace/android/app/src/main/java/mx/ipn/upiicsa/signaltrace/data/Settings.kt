@@ -14,7 +14,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Secrets at rest on the phone: AES-256-GCM with a non-exportable key inside the Android Keystore.
- * The device token and the anonymisation key are stored only in this encrypted form.
+ * The device token is stored only in this encrypted form.
  */
 object SecureStore {
     private const val ALIAS = "signaltrace-secrets"
@@ -72,29 +72,44 @@ class Settings(context: Context) {
     var suite: String
         get() = p.getString("suite", Protocol.SUITE_AES)!!
         set(v) = p.edit().putString("suite", v).apply()
-    var anonymize: Boolean
-        get() = p.getBoolean("anon", true)
-        set(v) = p.edit().putBoolean("anon", v).apply()
+    /** SHA-256 (hex) of the server's self-signed TLS certificate, pinned from the QR; null = normal TLS validation. */
+    var tlsPin: String?
+        get() = p.getString("tlsPin", null)
+        set(v) = p.edit().putString("tlsPin", v).apply()
 
+    /** Every sensor of the bank is exposed by default; the user can turn each one off. */
     fun source(name: String) = p.getBoolean("src.$name", true)
     fun setSource(name: String, on: Boolean) = p.edit().putBoolean("src.$name", on).apply()
-
-    /** Local HMAC key for anonymising SSID/BSSID/cell id; created once, never sent. */
-    val anonKey: ByteArray
-        get() {
-            p.getString("anonKey", null)?.let { s -> SecureStore.decrypt(s)?.let { return it } }
-            val k = Protocol.randomBytes(32)
-            p.edit().putString("anonKey", SecureStore.encrypt(k)).apply()
-            return k
-        }
 
     val isPinned get() = pinnedKey != null && fingerprint != null
     val isRegistered get() = deviceId != null && deviceToken != null
 
     fun forgetDevice() = p.edit().remove("did").remove("dtok").apply()
-    fun forgetPin() = p.edit().remove("pinKey").remove("pinFp").apply()
+    fun forgetPin() = p.edit().remove("pinKey").remove("pinFp").remove("tlsPin").apply()
+
+    data class Source(val id: String, val group: String, val label: String)
 
     companion object {
-        val SOURCES = listOf("gps" to "GPS", "mot" to "Movimiento", "bat" to "Batería", "net" to "Red", "probe" to "Sondeo de enlace", "wifi" to "Wi-Fi (RSSI)", "cell" to "Celular")
+        /** The sensor bank, in the same order and with the same ids as the web agent and the payload. */
+        val SOURCES = listOf(
+            Source("mot", "Movimiento", "Acelerómetro (RMS, pico y espectro)"),
+            Source("lin", "Movimiento", "Aceleración lineal"),
+            Source("grv", "Movimiento", "Gravedad"),
+            Source("gyr", "Movimiento", "Giroscopio"),
+            Source("mfl", "Orientación", "Magnetómetro"),
+            Source("ori", "Orientación", "Orientación (vector de rotación)"),
+            Source("lux", "Entorno", "Luz ambiental"),
+            Source("prx", "Entorno", "Proximidad"),
+            Source("hpa", "Entorno", "Presión barométrica"),
+            Source("tmp", "Entorno", "Temperatura ambiente"),
+            Source("hum", "Entorno", "Humedad relativa"),
+            Source("stp", "Entorno", "Podómetro (pasos)"),
+            Source("bat", "Dispositivo", "Batería"),
+            Source("net", "Señales", "Red (tipo y ancho de banda)"),
+            Source("probe", "Señales", "Sondeo de enlace (RTT, jitter, pérdida)"),
+            Source("wifi", "Señales", "Señal Wi-Fi (RSSI)"),
+            Source("cell", "Señales", "Señal celular (dBm)"),
+        )
+        fun label(id: String) = SOURCES.firstOrNull { it.id == id }?.label ?: id
     }
 }
