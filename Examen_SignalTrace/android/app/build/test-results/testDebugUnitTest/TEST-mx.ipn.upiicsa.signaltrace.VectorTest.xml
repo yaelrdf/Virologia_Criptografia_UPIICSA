@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="mx.ipn.upiicsa.signaltrace.VectorTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-25T19:15:47.152Z" hostname="dev-services" time="0.384">
+  <properties/>
+  <testcase name="sigmixPacketStages" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.092"/>
+  <testcase name="ecdhSharedSecret" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.015"/>
+  <testcase name="packetSealMatchesAesGcmVector" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.034"/>
+  <testcase name="hkdfOutputs" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.01"/>
+  <testcase name="sigmixRoundTripAllLengths" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.156"/>
+  <testcase name="sigmixWorkedExample" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.018"/>
+  <testcase name="chachaRoundTrip" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.013"/>
+  <testcase name="derConversion" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.003"/>
+  <testcase name="transcriptAndSignature" classname="mx.ipn.upiicsa.signaltrace.VectorTest" time="0.027"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

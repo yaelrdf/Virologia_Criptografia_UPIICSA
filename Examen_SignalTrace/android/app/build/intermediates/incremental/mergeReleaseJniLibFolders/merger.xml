@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/yaelrdf/git/Virologia_Criptografia_UPIICSA/Examen_SignalTrace/android/app/src/main/jniLibs"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/home/yaelrdf/git/Virologia_Criptografia_UPIICSA/Examen_SignalTrace/android/app/src/release/jniLibs"/></dataSet></merger>

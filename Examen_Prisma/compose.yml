@@ -1,0 +1,60 @@
+  services:
+  prisma:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    container_name: prisma-app
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      Jwt__Key: ${JWT_KEY:?Define JWT_KEY (al menos 32 caracteres)}
+      Admin__Password: ${ADMIN_PASSWORD:?Define ADMIN_PASSWORD (al menos 8 caracteres)}
+      Admin__Username: ${ADMIN_USERNAME:-admin}
+      Jwt__Hours: ${JWT_HOURS:-8}
+      Demo__Trace: ${DEMO_TRACE:-false}
+    volumes:
+      - prisma-data:/app/data
+    networks:
+      - internal_net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: prisma-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-${CLOUDFLARE_TUNNEL_TOKEN:?Define TUNNEL_TOKEN (Token de Cloudflare Zero Trust)}}
+    networks:
+      - tunnel_net    # Acceso a Internet para conectar con los edge servers de Cloudflare
+      - internal_net  # Comunicación interna exclusiva hacia el contenedor prisma
+    depends_on:
+      prisma:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+
+
+networks:
+  internal_net:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+
+  tunnel_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  prisma-data:
+    name: prisma-data
