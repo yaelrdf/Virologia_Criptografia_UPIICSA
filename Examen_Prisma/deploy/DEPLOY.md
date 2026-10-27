@@ -31,7 +31,31 @@ docker run --rm -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" -e Admin__
 ```
 Abre `http://localhost:8080` y prueba `http://localhost:8080/api/health`.
 
-## 4. Ejemplo: Render (Web Service con Docker)
+## 4. Despliegue con Docker Compose y Cloudflare Tunnel (Recomendado)
+
+Esta opción permite publicar el servicio con HTTPS y protección DDoS/WAF de Cloudflare sin abrir puertos en el router o firewall del servidor:
+
+1. Crea un túnel en **Cloudflare Zero Trust** (`Networks` → `Tunnels` → `Create a tunnel`).
+2. Configura el hostname público:
+   - **Service**: `HTTP`
+   - **URL**: `prisma:8080`
+3. Copia el token del túnel.
+4. Crea tu archivo `.env` a partir de `.env.example`:
+   ```bash
+   cp deploy/.env.example .env
+   # Llena JWT_KEY, ADMIN_PASSWORD y TUNNEL_TOKEN
+   ```
+5. Inicia los contenedores:
+   ```bash
+   docker compose up -d --build
+   ```
+
+### Seguridad en redes de Docker implementada
+- **Sin puertos expuestos al host:** la app no publica puertos (`ports:`), impidiendo el escaneo directo de la IP del servidor.
+- **Red interna aislada (`internal_net` con `internal: true`):** la aplicación no tiene gateway hacia Internet ni puede iniciar conexiones hacia el exterior.
+- **Red de túnel (`tunnel_net`):** solo `cloudflared` tiene salida al exterior para comunicarse con la red de Cloudflare y reenviar las solicitudes a `prisma:8080`.
+
+## 5. Ejemplo: Render (Web Service con Docker)
 1. Sube el repositorio a GitHub (rama con `Examen_Prisma/`).
 2. En Render: **New → Web Service →** el repositorio. *Root Directory*: `Examen_Prisma`. *Runtime*: Docker. *Dockerfile Path*: `deploy/Dockerfile`.
 3. *Environment*: agrega `Jwt__Key` y `Admin__Password`.
@@ -40,7 +64,7 @@ Abre `http://localhost:8080` y prueba `http://localhost:8080/api/health`.
 
 En otros proveedores los pasos son equivalentes: imagen desde `deploy/Dockerfile`, puerto 8080, las dos variables y un volumen en `/app/data`. El servidor ya acepta las cabeceras `X-Forwarded-*` del proxy HTTPS.
 
-## 5. Apuntar la app Android al servidor
+## 6. Apuntar la app Android al servidor
 - **Sin recompilar:** en la pantalla de inicio de sesión, toca el ícono de ajustes, escribe `https://<tu-dominio>` y pulsa "Probar conexión".
 - **Como valor por defecto del APK:** recompila con la URL final:
   ```bash
@@ -49,7 +73,7 @@ En otros proveedores los pasos son equivalentes: imagen desde `deploy/Dockerfile
 
 La app acepta `http://` (útil en la red local, con un aviso de conexión sin cifrar) y `https://`. En la nube **usa HTTPS**: con HTTP, la contraseña y la imagen-llave viajarían sin cifrar.
 
-## 6. Comprobación posterior
+## 7. Comprobación posterior
 1. `GET https://<tu-dominio>/api/health` → `{"status":"ok",…}`.
 2. Entra a la web como `admin`, abre **Admin** y revisa que la auditoría registre tu login.
 3. Crea un usuario, activa el 2FA, cierra sesión y vuelve a entrar con la imagen-llave desde la web y desde la app.
