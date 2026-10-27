@@ -198,6 +198,22 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     }
 
     [Fact]
+    public async Task Enrollment_BehindHttpsProxy_UsesPublicOrigin_WithoutTlsPin()
+    {
+        var http = Client();
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/enroll");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
+        // What cloudflared forwards: plain HTTP to the container, original Host and X-Forwarded-Proto: https.
+        req.Headers.Host = "signaltrace.example.com";
+        req.Headers.Add("X-Forwarded-Proto", "https");
+        var enroll = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
+        var qr = enroll.GetProperty("qr").GetString()!;
+        Assert.StartsWith("https://signaltrace.example.com/agent.html#enroll=", qr);
+        Assert.DoesNotContain("&tls=", qr);
+        Assert.False(enroll.TryGetProperty("tls", out _));
+    }
+
+    [Fact]
     public async Task Lab_Ycm1Attack_RecoversSecondMessage()
     {
         var http = Client();

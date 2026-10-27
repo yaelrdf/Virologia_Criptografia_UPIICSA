@@ -11,6 +11,11 @@ services:
     environment:
       Admin__Password: "${ADMIN_PASSWORD:-SignalTrace2026!}"
       Mqtt__Enabled: "true"
+      # Public URL behind a TLS proxy or Cloudflare Tunnel (e.g. https://signaltrace.example.com): the QR uses it and
+      # does not pin the LAN certificate. Leave empty for local-network use.
+      Server__PublicUrl: "${PUBLIC_URL:-}"
+      # LAN HTTPS with a self-signed certificate (phones on the same network). Set HTTPS_ENABLED=false behind a tunnel.
+      Https__Enabled: "${HTTPS_ENABLED:-true}"
       # Inside the container the LAN IP is unknown: set the host's address so the QR points to it.
       Https__AdvertiseUrl: "${ST_HTTPS_URL:-}"
       Lab__Enabled: "${LAB_ENABLED:-true}"
