@@ -113,3 +113,9 @@ th { color: var(--muted); font-weight: 600; }
   gap: 8px; width: max-content; max-width: calc(100% - 32px); pointer-events: none;
 }
 .toast { background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; box-shadow: var(--shadow); }
+
+dialog.modal { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); width: min(420px, calc(100vw - 32px)); padding: 20px; }
+dialog.modal::backdrop { background: rgb(0 0 0 / 45%); }
+dialog.modal h2 { margin-top: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+[hidden] { display: none !important; }

@@ -1,6 +1,6 @@
 // Link quality measured by the app itself against our server (works the same on web and native):
 // 10 small POST /api/ping per round → mean RTT, jitter (mean |Δrtt|), loss; every few rounds a 64 KB download → kbps.
-import { round } from "./geo.js";
+import { round } from "./util.js";
 
 let last = null, timer = null, rounds = 0, running = false;
 

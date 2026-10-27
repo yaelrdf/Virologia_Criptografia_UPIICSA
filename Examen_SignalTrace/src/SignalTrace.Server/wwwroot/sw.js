@@ -1,8 +1,8 @@
 // Service worker: caches only the static shell so the PWA opens offline. It NEVER caches /api or /hubs:
-// telemetry and keys must always come from the network. (Service workers cannot read sensors or GPS.)
-const CACHE = "signaltrace-shell-v1";
+// telemetry and keys must always come from the network. (Service workers cannot read sensors.)
+const CACHE = "signaltrace-shell-v2";
 const SHELL = ["index.html", "agent.html", "app.html", "css/base.css", "css/layout.css", "js/api.js", "js/ui/shell.js",
-  "js/agent.js", "js/crypto/util.js", "js/crypto/ycm1.js", "js/crypto/session.js", "icons/icon.svg", "manifest.webmanifest"];
+  "js/agent.js", "js/crypto/util.js", "js/crypto/ycm1.js", "js/crypto/session.js", "icons/favicon.png", "icons/icon-192.png", "manifest.webmanifest"];
 
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys()

@@ -6,9 +6,11 @@
   <title>SignalTrace · Iniciar sesión</title>
   <meta name="theme-color" content="#0f6cbd">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
+  <style>.login-brand { font-size: 1.4rem; } .login-brand img { width: 64px; height: 64px; }</style>
 </head>
 <body>
   <main class="center-page">
@@ -28,7 +30,7 @@
   <script type="module">
     import { api, setAuth, getAuth, esc } from "./js/api.js";
     import { LOGO, registerServiceWorker } from "./js/ui/shell.js";
-    document.getElementById("logo").innerHTML = `<span class="brand" style="font-size:1.2rem">${LOGO}<span>SignalTrace</span></span>`;
+    document.getElementById("logo").innerHTML = `<span class="brand login-brand">${LOGO}<span>SignalTrace</span></span>`;
     const q = new URLSearchParams(location.search);
     const next = /^[a-z]+\.html$/.test(q.get("next") || "") ? q.get("next") : "app.html";
     const msg = document.getElementById("msg");

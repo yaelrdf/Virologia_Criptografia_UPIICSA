@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SignalTrace · Consola</title>
   <meta name="theme-color" content="#0f6cbd">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <style>
@@ -83,14 +84,8 @@
             <h3>5 · Texto claro <small id="p-ent"></small></h3>
             <pre id="p-json" class="mono"></pre>
           </section>
-          <div class="grid two">
-            <section class="card"><h3>Entropía por etapa (bits/byte)</h3><div class="chart-box"><canvas id="c-ent"></canvas></div>
-              <p class="small muted" style="margin-top:6px">Con n bytes la entropía empírica no puede pasar de log₂ n (≈ 7.2 para 150 B); en capturas largas el texto cifrado se acerca a 8.</p></section>
-            <section class="card"><h3>Contraste: César (+3) <small class="muted" id="c-ent-caesar"></small></h3>
-              <p class="small muted">Un cifrado clásico conserva la distribución de bytes del texto claro (misma entropía) y se rompe probando 256 desplazamientos.</p>
-              <div class="hexview" id="c-hex"></div>
-            </section>
-          </div>
+          <section class="card"><h3>Entropía por etapa (bits/byte)</h3><div class="chart-box"><canvas id="c-ent"></canvas></div>
+            <p class="small muted" style="margin-top:6px">Con n bytes la entropía empírica no puede pasar de log₂ n (≈ 7.2 para 150 B); en capturas largas el texto cifrado se acerca a 8.</p></section>
           <section class="card" id="keys-card" hidden><h3>Llaves de sesión (modo clase)</h3><dl class="kv" id="keys"></dl></section>
         </div>
       </section>

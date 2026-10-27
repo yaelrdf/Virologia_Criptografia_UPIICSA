@@ -20,10 +20,16 @@ public static class DataEndpoints
     {
         var api = app.MapGroup("/api").RequireAuthorization("user");
 
-        api.MapGet("/readings", async (Guid deviceId, long? from, long? to, int? limit, AppDb db, ClaimsPrincipal me, AtRestProtector atRest) =>
+        // History of one device. maxPoints decimates long ranges (every k-th reading) so 24 h still fit in a chart.
+        api.MapGet("/readings", async (Guid deviceId, long? from, long? to, int? limit, int? maxPoints, AppDb db, ClaimsPrincipal me, AtRestProtector atRest) =>
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
             var rows = await Query(db, deviceId, from, to, limit ?? 500);
+            if (maxPoints is > 0 and var maxP && rows.Count > maxP)
+            {
+                var stride = (int)Math.Ceiling(rows.Count / (double)maxP);
+                rows = rows.Where((_, i) => i % stride == 0 || i == rows.Count - 1).ToList();
+            }
             return Results.Ok(rows.Select(r => ReadingDto.From(r, Parse(atRest, r.Json), null)));
         });
 
