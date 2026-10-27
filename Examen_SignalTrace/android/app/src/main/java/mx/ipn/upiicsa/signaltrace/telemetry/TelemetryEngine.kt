@@ -17,7 +17,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import mx.ipn.upiicsa.signaltrace.BuildConfig
-import mx.ipn.upiicsa.signaltrace.crypto.Protocol
 import mx.ipn.upiicsa.signaltrace.data.Api
 import mx.ipn.upiicsa.signaltrace.data.ApiException
 import mx.ipn.upiicsa.signaltrace.data.Session
@@ -74,23 +73,23 @@ object TelemetryEngine {
         val settings = Settings(ctx)
         queueFile = File(ctx.filesDir, "queue.jsonl")
         loadQueue()
-        val anon: (String) -> String? = { v -> if (settings.anonymize) Protocol.anonymize(settings.anonKey, v) else v }
+        val bank = SensorBankCollector.TYPES.keys.filter(settings::source).toSet()
         val collectors = buildMap<String, Collector> {
-            if (settings.source("gps")) put("gps", LocationCollector(ctx))
             if (settings.source("mot")) put("mot", MotionCollector(ctx))
+            if (bank.isNotEmpty()) put("bank", SensorBankCollector(ctx, bank))
             if (settings.source("bat")) put("bat", BatteryCollector(ctx))
             if (settings.source("net")) put("net", NetCollector(ctx))
-            if (settings.source("wifi")) put("wifi", WifiCollector(ctx, anon))
-            if (settings.source("cell")) put("cell", CellCollector(ctx, anon))
+            if (settings.source("wifi")) put("wifi", WifiCollector(ctx))
+            if (settings.source("cell")) put("cell", CellCollector(ctx))
         }
         collectors.values.forEach { runCatching { it.start() } }
-        val api = Api(settings.serverUrl)
+        val api = Api(settings.serverUrl, settings.tlsPin)
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
         session = null
         _state.update { it.copy(running = true) }
         status(EngineState.Level.INFO, "Iniciando…")
-        log("Telemetría iniciada · cada ${settings.intervalSec} s · ${settings.suite}")
+        log("Telemetría iniciada · cada ${settings.intervalSec} s · ${settings.suite} · ${Settings.SOURCES.count { settings.source(it.id) }} sensores expuestos")
 
         if (settings.source("probe")) s.launch { probeLoop(api) }
         s.launch {
@@ -115,13 +114,16 @@ object TelemetryEngine {
     private fun sample(settings: Settings, c: Map<String, Collector>) {
         packets++
         val t = System.currentTimeMillis()
+        val bank = LinkedHashMap<String, JsonObject>().also { (c["bank"] as? SensorBankCollector)?.fill(it) }
+        val probe = if (settings.source("probe")) probeResult.value else null
         val payload = buildJsonObject {
             put("t", t)
             put("src", "android")
-            (c["gps"] as? LocationCollector)?.json()?.let { put("gps", it) }
             (c["mot"] as? MotionCollector)?.json(includeWindow = packets % 5 == 0L)?.let { put("mot", it) }
+            bank.forEach { (k, v) -> put(k, v) }
             (c["bat"] as? BatteryCollector)?.json()?.let { put("bat", it) }
-            (c["net"] as? NetCollector)?.json(probeResult.value)?.let { put("net", it) }
+            val net = c["net"] as? NetCollector
+            if (net != null) net.json(probe)?.let { put("net", it) } else if (probe != null) put("net", buildJsonObject { put("probe", probe) })
             (c["wifi"] as? WifiCollector)?.json()?.let { put("wifi", it) }
             (c["cell"] as? CellCollector)?.json()?.let { put("cell", it) }
             put("app", buildJsonObject { put("vis", true); put("ver", BuildConfig.VERSION_NAME) })

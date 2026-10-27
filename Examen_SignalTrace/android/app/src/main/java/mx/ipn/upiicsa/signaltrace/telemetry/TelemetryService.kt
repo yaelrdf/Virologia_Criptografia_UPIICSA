@@ -27,7 +27,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Foreground service of type "location" (PLAN §13.3): keeps sampling and sending with the screen locked.
+ * Foreground service of type "specialUse" (sensor telemetry): keeps sampling and sending with the screen locked.
  * It is started only from the visible UI, shows a persistent notification with a Stop action and holds a partial wake lock.
  */
 class TelemetryService : Service() {
@@ -44,7 +44,7 @@ class TelemetryService : Service() {
             return START_NOT_STICKY
         }
         createChannel()
-        val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
         try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Iniciando…"), type)
         } catch (e: Exception) {

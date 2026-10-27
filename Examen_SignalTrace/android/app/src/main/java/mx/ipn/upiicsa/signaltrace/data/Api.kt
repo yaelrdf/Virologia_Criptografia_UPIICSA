@@ -12,12 +12,18 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.security.KeyPair
+import java.security.MessageDigest
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 
 @Serializable data class LoginResponse(val token: String, val expiresAt: Long, val role: String, val username: String)
 @Serializable data class ServerKey(val publicKey: String, val fingerprint: String, val suites: List<String> = emptyList())
 @Serializable data class DeviceRegistration(val deviceId: String, val deviceToken: String)
+@Serializable data class Enrollment(val code: String, val qr: String, val fingerprint: String, val tls: String? = null)
 @Serializable data class HandshakeResponse(val sessionId: String, val serverPublicKey: String, val serverNonce: String, val signature: String, val expiresAt: Long, val suite: String)
 @Serializable data class Envelope(val v: Int, val sid: String, val did: String, val seq: Long, val ts: Long, val ct: String)
 
@@ -30,14 +36,36 @@ class Session(val sid: String, val did: String, val keys: Protocol.SessionKeys, 
 }
 
 /**
- * REST client of the SignalTrace API (PLAN §7). Pure JVM (OkHttp + kotlinx.serialization) so the JVM tests can run
- * the full flow against a real server.
+ * Trusts exactly one TLS certificate: the server's self-signed LAN certificate whose SHA-256 came in the QR
+ * (certificate pinning). Any other certificate, even one signed by a public CA, is rejected.
  */
-class Api(baseUrl: String) {
+class PinnedCertTrust(private val sha256Hex: String) : X509TrustManager {
+    override fun checkClientTrusted(chain: Array<out X509Certificate>, authType: String) = throw CertificateException("client certificates not used")
+    override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String) {
+        val leaf = chain.firstOrNull() ?: throw CertificateException("empty chain")
+        val got = MessageDigest.getInstance("SHA-256").digest(leaf.encoded).joinToString("") { "%02x".format(it) }
+        if (!got.equals(sha256Hex, ignoreCase = true)) throw CertificateException("TLS certificate does not match the pinned one")
+    }
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+}
+
+/**
+ * REST client of the SignalTrace API (PLAN §7). Pure JVM (OkHttp + kotlinx.serialization) so the JVM tests can run
+ * the full flow against a real server. With [tlsPin] only the pinned self-signed certificate is accepted.
+ */
+class Api(baseUrl: String, tlsPin: String? = null) {
     val base = baseUrl.trim().trimEnd('/')
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     private val jsonType = "application/json".toMediaType()
-    private val http = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build()
+    private val http = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).apply {
+        if (tlsPin != null) {
+            val trust = PinnedCertTrust(tlsPin)
+            val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
+            sslSocketFactory(ssl.socketFactory, trust)
+            // The pinned certificate itself is the identity: the LAN IP in the URL may change between DHCP leases.
+            hostnameVerifier { _, _ -> true }
+        }
+    }.build()
     private val b64 = Base64.getEncoder()
     private val unb64 = Base64.getDecoder()
 
@@ -68,6 +96,9 @@ class Api(baseUrl: String) {
 
     fun registerDevice(userToken: String, name: String): DeviceRegistration =
         json.decodeFromString(ok(call("POST", "/api/devices", obj("name" to name, "kind" to "android"), userToken)))
+
+    /** Creates a one-time linking code (what the dashboard shows as a QR). */
+    fun enroll(userToken: String): Enrollment = json.decodeFromString(ok(call("POST", "/api/enroll", "{}", userToken)))
 
     fun redeemEnrollment(code: String, name: String): DeviceRegistration =
         json.decodeFromString(ok(call("POST", "/api/enroll/redeem", obj("code" to code, "name" to name, "kind" to "android"))))
