@@ -25,12 +25,16 @@ public static class DataEndpoints
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
             var rows = await Query(db, deviceId, from, to, limit ?? 500);
+            // z-scores over the full series (before decimation), as the live pipeline computes them.
+            var z = AnalyticsEngine.RollingZ(rows);
+            var picked = Enumerable.Range(0, rows.Count);
             if (maxPoints is > 0 and var maxP && rows.Count > maxP)
             {
                 var stride = (int)Math.Ceiling(rows.Count / (double)maxP);
-                rows = rows.Where((_, i) => i % stride == 0 || i == rows.Count - 1).ToList();
+                // Keep every k-th reading, the last one and every anomaly so decimation does not hide them.
+                picked = picked.Where(i => i % stride == 0 || i == rows.Count - 1 || z[i]?.Values.Any(v => Math.Abs(v) > AnalyticsEngine.ZThreshold) == true);
             }
-            return Results.Ok(rows.Select(r => ReadingDto.From(r, Parse(atRest, r.Json), null)));
+            return Results.Ok(picked.Select(i => ReadingDto.From(rows[i], Parse(atRest, rows[i].Json), null, z[i])));
         });
 
         // Regular time grid for one field: real samples, interpolated points (flagged) and gaps (null).

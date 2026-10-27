@@ -1,6 +1,6 @@
-# Criptoanálisis de SigMix
+# Criptoanálisis de Yael Crypto March1
 
-Un algoritmo inventado debe acompañarse de un análisis honesto de sus límites. **SigMix no es seguro por sí solo.** En SignalTrace solo aporta valor didáctico y una capa adicional *debajo* de AES-256-GCM.
+Un algoritmo inventado debe acompañarse de un análisis honesto de sus límites. **Yael Crypto March1 no es seguro por sí solo.** En SignalTrace solo aporta valor didáctico y una capa adicional *debajo* de AES-256-GCM.
 
 ## Por qué es débil
 
@@ -12,7 +12,7 @@ Un algoritmo inventado debe acompañarse de un análisis honesto de sus límites
 
 Eve conoce un mensaje P y su cifrado C, y quiere descifrar otro mensaje C' cifrado con los mismos parámetros, como pasaría si se reutilizaran (equivalente a reutilizar un nonce).
 
-![Ataque de texto claro conocido contra SigMix de 1 ronda](diagramas/png/10_ataque_sigmix.png)
+![Ataque de texto claro conocido contra Yael Crypto March1 de 1 ronda](diagramas/png/10_ataque_ycm1.png)
 
 1. Para cada rotación posible `rot ∈ [0, n)` deshace la permutación: `y = rotarDer(C, rot)`.
 2. Para cada `seed ∈ [0, 256)` genera el flujo y calcula `a_i = p_i + s_i (mod 256)`.
@@ -24,7 +24,7 @@ Eve conoce un mensaje P y su cifrado C, y quiere descifrar otro mensaje C' cifra
 5. Comprueba que `K·(p + s) = y` para **todos** los pares. Si se cumple, encontró los parámetros.
 6. Como solo conoce `rot mod n`, para un mensaje de otra longitud prueba los candidatos `rot + j·n ≤ 255` y se queda con el que produce un JSON válido.
 
-Como mucho prueba 256·n candidatos: para un mensaje de 50 bytes, unos 13 000, en milisegundos. El laboratorio lo ejecuta en vivo, `SigMixCryptanalysis.cs` lo implementa y `CryptanalysisTests` lo verifica en 5 casos aleatorios.
+Como mucho prueba 256·n candidatos: para un mensaje de 50 bytes, unos 13 000, en milisegundos. El laboratorio lo ejecuta en vivo, `Ycm1Cryptanalysis.cs` lo implementa y `CryptanalysisTests` lo verifica en 5 casos aleatorios.
 
 ```
 función AtaqueTextoConocido(P, C):
@@ -46,16 +46,18 @@ función ResolverLineal(a, b):    // todas las x en Z256 con a·x ≡ b
 
 ## Por qué en SignalTrace no aplica
 
-- **Parámetros distintos por paquete.** `h = SHA-256(k_sig ‖ seq ‖ "SigMix")` cambia con cada `seq`, y `seq` nunca se repite dentro de una sesión.
-- **SigMix nunca queda expuesto.** Eve solo ve la salida de AES-256-GCM. Para atacar SigMix necesitaría primero romper AES-GCM, y en ese caso SigMix ya no importaría.
-- **Integridad.** Modificar el paquete se detecta con la etiqueta GCM, no con SigMix. SigMix no ofrece autenticidad.
+- **Parámetros distintos por paquete.** `h = SHA-256(k_sig ‖ seq ‖ "YCM1")` cambia con cada `seq`, y `seq` nunca se repite dentro de una sesión.
+- **Yael Crypto March1 nunca queda expuesto.** Eve solo ve la salida de AES-256-GCM. Para atacar Yael Crypto March1 necesitaría primero romper AES-GCM, y en ese caso Yael Crypto March1 ya no importaría.
+- **Integridad.** Modificar el paquete se detecta con la etiqueta GCM, no con Yael Crypto March1. Yael Crypto March1 no ofrece autenticidad.
 - **Lección:** la seguridad real del sistema se apoya en primitivas estándar y revisadas (AES-GCM, ECDH, ECDSA, HKDF, PBKDF2). El algoritmo propio va como capa adicional y nunca como única defensa.
 
-## Comparación con César
+## Comparación
 
-| | César (+3) | SigMix (3 rondas) sin AES | SigMix + AES-256-GCM |
-|---|---|---|---|
-| Espacio de llaves | 256 | ≤ 2⁸⁰ por paquete | 2²⁵⁶ (AES) |
-| Entropía de la salida | Igual a la del texto (≈ 4.5) | ≈ 6–7 bits/byte | ≈ 8 bits/byte (en capturas largas) |
-| Texto claro conocido | Trivial | Roto (1 ronda, en ms) | No aplica |
-| Integridad | No | No | Sí (etiqueta de 128 bits) |
+| | Yael Crypto March1 (3 rondas) sin AES | Yael Crypto March1 + AES-256-GCM |
+|---|---|---|
+| Espacio de llaves | ≤ 2⁸⁰ por paquete | 2²⁵⁶ (AES) |
+| Entropía de la salida | ≈ 6–7 bits/byte | ≈ 8 bits/byte (en capturas largas) |
+| Texto claro conocido | Roto (1 ronda, en ms) | No aplica |
+| Integridad | No | Sí (etiqueta de 128 bits) |
+
+**Sobre el nombre.** El algoritmo se llama *Yael Crypto March1* (abreviado YCM1). La abreviatura aparece en las etiquetas que separan sus llaves de las demás: `st1/ycm1` en HKDF y `"YCM1"` en la derivación de parámetros. Cambiar el nombre cambió esas etiquetas, y por eso se regeneraron todos los vectores de prueba con `reference/gen_vectors.py`.

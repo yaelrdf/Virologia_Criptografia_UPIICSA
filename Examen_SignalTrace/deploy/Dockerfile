@@ -20,6 +20,6 @@ USER $APP_UID
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080 \
     Storage__DataDir=/app/data
-EXPOSE 8080 1883
+EXPOSE 8080 5443 1883
 VOLUME ["/app/data"]
 ENTRYPOINT ["dotnet", "SignalTrace.Server.dll"]

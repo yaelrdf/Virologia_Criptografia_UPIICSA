@@ -43,6 +43,26 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     }
 
     [Fact]
+    public async Task History_Carries_RollingZScores()
+    {
+        var http = fx.Factory.CreateClient();
+        var admin = await TestDevice.Login(http);
+        var dev = await TestDevice.Create(http, admin);
+        await dev.Handshake();
+        var t0 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 60_000;
+        // 12 readings around −60 dBm, then a −100 dBm drop: |z| > 3 against the previous window.
+        for (var i = 0; i < 13; i++)
+        {
+            var rssi = i < 12 ? -60 - i % 2 : -100;
+            Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal($"{{\"t\":$T,\"src\":\"sim\",\"wifi\":{{\"rssi\":{rssi}}}}}", ts: t0 + i * 1000))).StatusCode);
+        }
+        var rows = await Get(http, admin, $"/api/readings?deviceId={dev.DeviceId}&maxPoints=5");
+        var last = rows.EnumerateArray().Last();
+        Assert.True(last.GetProperty("z").GetProperty("rssi").GetDouble() < -3);
+        Assert.True(rows.GetArrayLength() <= 6); // decimated, but the anomaly is kept
+    }
+
+    [Fact]
     public async Task SensorBank_Columns_And_CsvExport()
     {
         var http = fx.Factory.CreateClient();

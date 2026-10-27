@@ -6,7 +6,7 @@ digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontna
   prk [label="HKDF-Extract: PRK = HMAC-SHA256(salt = nonceC || nonceS, z)"];
   exp [label="HKDF-Expand: T(1) = HMAC(PRK, info || 0x01), …"];
   k1 [label="k_aes = HKDF(\"st1/aes-up\", 32 B)", fillcolor="#E6F4EA", color="#1A7F37"];
-  k2 [label="k_sig = HKDF(\"st1/sigmix\", 32 B)", fillcolor="#E6F4EA", color="#1A7F37"];
+  k2 [label="k_sig = HKDF(\"st1/ycm1\", 32 B)", fillcolor="#E6F4EA", color="#1A7F37"];
   k3 [label="iv_salt = HKDF(\"st1/iv-up\", 4 B)", fillcolor="#E6F4EA", color="#1A7F37"];
   c -> zc; s -> zs; zc -> eq; zs -> eq; eq -> prk -> exp -> {k1 k2 k3};
 }

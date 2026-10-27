@@ -88,14 +88,14 @@ public sealed record ReadingDto(
     double? RmsEma, double? RttEma, double? RssiEma,
     double? BatSlopeH, double? BatEtaMin, double? RssiSlopeMin, Dictionary<string, double>? Z, TelemetryPayload? P)
 {
-    public static ReadingDto From(Reading r, TelemetryPayload? p, AnalyticsResult? a) => new(
+    public static ReadingDto From(Reading r, TelemetryPayload? p, AnalyticsResult? a, Dictionary<string, double>? z = null) => new(
         r.DeviceId.ToString("D"), r.TsDevice, r.TsServer, r.Seq, r.Src,
         r.AccRms, p?.Mot?.Peak, r.GyrNorm, r.Lux, r.Hpa,
         r.BatLvl, p?.Bat?.Chg, r.NetType, p?.Net?.Eff,
         r.ProbeRtt, p?.Net?.Probe?.Jit, r.ProbeLoss, p?.Net?.Probe?.Kbps,
         r.WifiRssi, p?.Wifi?.Freq, r.CellDbm, r.CellType, p?.App?.Vis,
         a?.RmsEma, a?.RttEma, a?.RssiEma,
-        a?.BatterySlopePerHour, a?.BatteryEtaMinutes, a?.RssiSlopePerMinute, a is { Z.Count: > 0 } ? a.Z : null, WithoutSpectrum(p));
+        a?.BatterySlopePerHour, a?.BatteryEtaMinutes, a?.RssiSlopePerMinute, a is { Z.Count: > 0 } ? a.Z : z is { Count: > 0 } ? z : null, WithoutSpectrum(p));
 
     /// <summary>The magnitude window (up to 256 numbers) is only needed for the spectrum, which travels separately.</summary>
     private static TelemetryPayload? WithoutSpectrum(TelemetryPayload? p)

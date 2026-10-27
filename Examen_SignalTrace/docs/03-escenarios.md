@@ -4,7 +4,7 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 
 **Personajes:** *Alicia* es el dispositivo legítimo, *Eve* escucha la red de forma pasiva y *Mallory* es una atacante activa que puede modificar, reenviar o interceptar mensajes.
 
-![Laboratorio: los 13 escenarios con el resultado esperado](capturas/web_lab.png)
+![Laboratorio: los 12 escenarios con el resultado esperado](capturas/web_lab.png)
 
 | Escenario | Qué ocurre | Esperado | Obtenido |
 |---|---|---|---|
@@ -15,12 +15,11 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 | Mallory altera `ts` | Cambia el `ts` del sobre (va en el AAD) | 422 auth_failed | ✅ |
 | Mallory MITM en el handshake | El servidor firma con una llave distinta de la fijada | El cliente rechaza la firma | ✅ |
 | Sesión perdida | Reinicio del servidor: se borran las sesiones | 404 y luego un nuevo handshake con 202 | ✅ |
-| Contenido inválido | Paquete auténtico con latitud de 200° | 422 invalid_payload | ✅ |
+| Contenido inválido | Paquete auténtico con humedad relativa de 140 % | 422 invalid_payload | ✅ |
 | Token ajeno o sin token | `did` distinto al del token | 401 | ✅ |
 | Suite ChaCha20-Poly1305 | Handshake que negocia ChaCha20 | 202 | ✅ |
-| Ataque a SigMix sin AES | Texto claro conocido contra 1 ronda | Se recupera el texto | ✅ (por eso SigMix va dentro de AES) |
-| Contraste César | Fuerza bruta de un desplazamiento | Roto en ≤ 256 intentos | ✅ |
-| Ejemplo de mano de SigMix | "Hi" con seed 7, k 3, m 5 | (236, 198) | ✅ |
+| Ataque a Yael Crypto March1 sin AES | Texto claro conocido contra 1 ronda | Se recupera el texto | ✅ (por eso Yael Crypto March1 va dentro de AES) |
+| Ejemplo de mano de Yael Crypto March1 | "Hi" con seed 7, k 3, m 5 | (236, 198) | ✅ |
 
 ## E1 · Funcionamiento normal
 
@@ -34,7 +33,7 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 
 - **Precondiciones:** Eve ve todos los bytes que viajan entre el teléfono y el servidor.
 - **Pasos:** se envía una lectura y se compara el texto claro con el sobre capturado.
-- **Resultado:** Eve ve `sid`, `did`, `seq` y `ts`, que son metadatos autenticados pero no cifrados. **No** ve la ubicación, la batería ni la red. La entropía del texto cifrado se acerca a 8 bits/byte, contra unos 4.5 del JSON.
+- **Resultado:** Eve ve `sid`, `did`, `seq` y `ts`, que son metadatos autenticados pero no cifrados. **No** ve ningún valor de los sensores: ni la orientación, ni la luz, ni la batería, ni la red. La entropía del texto cifrado se acerca a 8 bits/byte, contra unos 4.5 del JSON.
 
 ![Agente web: texto claro frente a lo que viaja por el cable](capturas/web_agente.png)
 
@@ -63,7 +62,7 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 
 ## E8 · Pantalla bloqueada o pestaña oculta (web)
 
-- **Resultado:** el navegador detiene el GPS, los sensores y los temporizadores. El agente muestra «En pausa» y en los datos queda un **hueco**. El dashboard re-muestrea sobre una malla temporal regular:
+- **Resultado:** el navegador detiene los sensores y los temporizadores. El agente muestra «En pausa» y en los datos queda un **hueco**. El dashboard re-muestrea sobre una malla temporal regular:
   - los huecos de hasta 5 intervalos se rellenan por **interpolación lineal**, marcados en naranja;
   - los más largos quedan como corte.
 
@@ -71,12 +70,12 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 
 ## E9 · Pantalla bloqueada (Android)
 
-- **Resultado esperado:** la telemetría continúa gracias al servicio en primer plano de tipo `location` y su notificación permanente. *No se probó en un dispositivo físico en esta entrega (ver Limitaciones). El flujo completo de la app sí se probó contra el servidor real con pruebas JVM.*
+- **Resultado esperado:** la telemetría continúa gracias al servicio en primer plano (tipo `specialUse`) y su notificación permanente. *No se probó en un dispositivo físico en esta entrega (ver Limitaciones). El flujo completo de la app sí se probó contra el servidor real con pruebas JVM.*
 
 ## E10 · Lectura anómala
 
 - **Pasos:** el simulador con `--anomalies` inyecta caídas de señal de 30 dB, picos de RTT de más de 600 ms y vibración fuerte.
-- **Resultado:** se generan alertas por umbral, por **z-score** (|z| > 3 en una ventana de 30) y por frecuencia dominante dentro de la banda de 4 a 6 Hz. Las alertas se repiten como máximo cada 60 s.
+- **Resultado:** el servidor calcula el **z-score** de cada muestra de movimiento, RTT y señal frente a las 30 anteriores. El dashboard marca con una ✕ roja en las gráficas las muestras con |z| > 3 y muestra el valor de z junto al dato en vivo. El espectro (DFT) deja ver la frecuencia dominante de la vibración. El sistema no genera alertas: las anomalías se analizan sobre los datos.
 
 ## E11 · Sin conexión
 
@@ -86,3 +85,22 @@ Cada escenario indica sus precondiciones, los pasos, el resultado esperado y el 
 ## E12 · Contraseñas
 
 - **Resultado:** una contraseña incorrecta recibe `401`. Tras 5 fallos, `429` con una espera creciente. Un usuario `viewer` no puede crear usuarios (`403`) ni ver los dispositivos de otros (`403`).
+
+## E13 · Vinculación por QR sin iniciar sesión en el teléfono
+
+- **Precondiciones:** un usuario abre el dashboard y pulsa «Vincular teléfono (QR)».
+- **Pasos:** el QR es la URL `https://<IP>:5443/agent.html#enroll=CÓDIGO&fp=HUELLA&tls=CERT`. La cámara del teléfono la abre en el navegador, que avisa una vez del certificado autofirmado. El agente compara la huella de la llave del servidor con la del QR, la fija y canjea el código.
+- **Resultado:** el teléfono queda vinculado a la cuenta de quien generó el QR, sin escribir contraseñas, y puede transmitir enseguida. El código sirve una sola vez y expira a los 10 minutos: un segundo canje recibe `401`. Si la huella no coincide, el agente **no** canjea el código y avisa de un posible intermediario. La app Android lee el mismo QR y además fija el certificado TLS.
+
+![Diálogo de vinculación con el QR (URL normal)](capturas/web_qr.png)
+
+## E14 · Gestión de usuarios
+
+- **Pasos:** el administrador cambia el rol de un usuario, restablece su contraseña y luego cambia la suya desde el menú de usuario.
+- **Resultado:**
+  - el cambio de rol se aplica en el siguiente inicio de sesión de ese usuario;
+  - el servidor se niega a degradar al último administrador (`400 last_admin`);
+  - el restablecimiento genera 16 caracteres aleatorios que se muestran una sola vez; la contraseña anterior deja de funcionar;
+  - cambiar la contraseña propia exige la actual (`400 wrong_password` si no coincide) y guarda un PBKDF2 nuevo con sal nueva.
+
+![Usuarios: cambio de rol y contraseña restablecida](capturas/web_usuarios.png)

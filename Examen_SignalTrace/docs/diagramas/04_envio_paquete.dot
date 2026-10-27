@@ -3,12 +3,12 @@ digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontna
   a [label="Temporizador (intervalo 0.5–30 s)", shape=oval, fillcolor="#DCEAF7"];
   vis [label="¿Pestaña visible / servicio activo?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
   pause [label="Estado «en pausa»\n(hueco en los datos)", fillcolor="#FFF4E5", color="#9A6700"];
-  col [label="Leer fuentes: GPS, movimiento (32 Hz → RMS, pico, ventana 64),\nbatería, red, sondeo de enlace, Wi-Fi/celular (Android)"];
+  col [label="Leer solo los sensores expuestos: movimiento (32 Hz → RMS, pico, ventana 64),\ngiroscopio, orientación, entorno, batería, red, sondeo, Wi-Fi/celular (Android)"];
   q [label="JSON en claro → cola local (IndexedDB / archivo, máx. 500)"];
   hs [label="¿Hay sesión?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
   doHs [label="Handshake ECDH + verificación ECDSA\ncon la huella fijada"];
   seq [label="seq ← seq + 1 (estrictamente creciente)"];
-  sm [label="sm = SigMix(json, k_sig, seq)  (3 rondas)"];
+  sm [label="sm = Yael Crypto March1(json, k_sig, seq)  (3 rondas)"];
   ae [label="nonce = iv_salt || u64(seq);  AAD = \"ST1\" || did || seq || ts\nct || tag = AES-256-GCM(k_aes, nonce, sm, AAD)"];
   post [label="POST /api/telemetry {v, sid, did, seq, ts, ct}"];
   res [label="Respuesta", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];

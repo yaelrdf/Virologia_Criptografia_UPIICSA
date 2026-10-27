@@ -21,17 +21,23 @@ public sealed class LanHttps
     /// <summary>SHA-256 of the certificate (DER), lowercase hex.</summary>
     public string? CertSha256 { get; }
 
+    private readonly string? _advertise;
+
     public LanHttps(IConfiguration cfg, ServerPaths paths)
     {
         Enabled = cfg.GetValue("Https:Enabled", false);
         Port = cfg.GetValue("Https:Port", 5443);
+        _advertise = cfg["Https:AdvertiseUrl"] is { Length: > 0 } a ? a.TrimEnd('/') : null;
         if (!Enabled) return;
         Certificate = LoadOrCreate(paths.File(cfg["Https:CertificatePath"] ?? "lan-cert.pfx"));
         CertSha256 = Bytes.ToHex(SHA256.HashData(Certificate.RawData));
     }
 
-    /// <summary>https://{first LAN IPv4}:{port}, the address a phone on the same network can reach.</summary>
-    public string? LanUrl => Enabled && LanAddresses().FirstOrDefault() is { } ip ? $"https://{ip}:{Port}" : null;
+    /// <summary>
+    /// The address a phone on the same network can reach: Https:AdvertiseUrl (e.g. the host's IP when running in a
+    /// container), else https://{first LAN IPv4}:{port}.
+    /// </summary>
+    public string? LanUrl => !Enabled ? null : _advertise ?? (LanAddresses().FirstOrDefault() is { } ip ? $"https://{ip}:{Port}" : null);
 
     public static IEnumerable<IPAddress> LanAddresses() =>
         NetworkInterface.GetAllNetworkInterfaces()

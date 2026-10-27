@@ -92,6 +92,25 @@ public sealed class AnalyticsEngine
         while (window.Count > ZWindow) window.Dequeue();
     }
 
+    /// <summary>
+    /// The same rolling z-scores for a stored series (history queries), so old anomalies are marked too.
+    /// Returns one dictionary per reading (keys rms, rtt, rssi), or null where no z could be computed yet.
+    /// </summary>
+    public static List<Dictionary<string, double>?> RollingZ(IReadOnlyList<Reading> rows)
+    {
+        var windows = new Dictionary<string, Queue<double>> { ["rms"] = new(), ["rtt"] = new(), ["rssi"] = new() };
+        var result = new List<Dictionary<string, double>?>(rows.Count);
+        foreach (var r in rows)
+        {
+            var res = new AnalyticsResult();
+            if (r.AccRms is { } rms) ZScore(res, windows["rms"], rms, "rms");
+            if (r.ProbeRtt is { } rtt) ZScore(res, windows["rtt"], rtt, "rtt");
+            if ((r.WifiRssi ?? r.CellDbm) is { } sig) ZScore(res, windows["rssi"], sig, "rssi");
+            result.Add(res.Z.Count > 0 ? res.Z : null);
+        }
+        return result;
+    }
+
     /// <summary>Least-squares slope over the last 5 minutes, expressed per <paramref name="unitMs"/>.</summary>
     private static double? Trend(Queue<(long T, double V)> q, long t, double v, double unitMs)
     {
