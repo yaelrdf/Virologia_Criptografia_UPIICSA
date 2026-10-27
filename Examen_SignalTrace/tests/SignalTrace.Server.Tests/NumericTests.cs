@@ -1,5 +1,4 @@
 using SignalTrace.Server.Analytics;
-using SignalTrace.Server.Endpoints;
 
 namespace SignalTrace.Server.Tests;
 
@@ -59,16 +58,6 @@ public class NumericTests
     }
 
     [Fact]
-    public void Haversine_KnownDistances()
-    {
-        // 1° of longitude on the equator = 2πR/360 = 111 194.93 m.
-        Assert.Equal(111_194.93, Numeric.Haversine(0, 0, 0, 1), 1);
-        // Zócalo CDMX → Ángel de la Independencia ≈ 3.6 km.
-        var d = Numeric.Haversine(19.4326, -99.1332, 19.4270, -99.1677);
-        Assert.InRange(d, 3500, 3700);
-    }
-
-    [Fact]
     public void Sma_Ema_ZScore()
     {
         double[] x = [1, 2, 3, 4, 5];
@@ -79,13 +68,5 @@ public class NumericTests
         Assert.Equal(2.25, e[2]);
         var window = Enumerable.Repeat(10.0, 9).Append(12.0).ToArray(); // μ = 10.2, σ = 0.6
         Assert.Equal(3.0, Numeric.ZScore(window, 12.0), 6);
-    }
-
-    [Fact]
-    public void Heatmap_GroupsByCell()
-    {
-        var cells = Heatmap.Build([(19.43260, -99.13320, -60), (19.43261, -99.13321, -70), (19.44, -99.14, -90)], 25);
-        Assert.Equal(2, cells.Count);
-        Assert.Contains(cells, c => c.Count == 2 && c.Mean == -65);
     }
 }

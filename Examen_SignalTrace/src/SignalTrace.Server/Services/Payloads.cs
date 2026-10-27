@@ -21,12 +21,11 @@ public static class PayloadValidator
         var p = payload;
         if (p.T != envelopeTs) return "t del payload no coincide con ts del sobre";
         if (!Sources.Contains(p.Src)) return "src debe ser web, android o sim";
-        if (p.Gps is { } g)
+        if (p.Bat is { } b)
         {
-            if (!In(g.Lat, -90, 90) || !In(g.Lon, -180, 180)) return "Coordenadas fuera de rango";
-            if (g.Acc is < 0 or > 100_000 || g.Spd is < 0 or > 500 || g.Hdg is < 0 or > 360 || g.Alt is < -1000 or > 20_000) return "GPS fuera de rango";
+            if (!In(b.Lvl, 0, 1)) return "Nivel de batería fuera de [0,1]";
+            if (b.Temp is < -40 or > 100 || b.Volt is < 0 or > 10) return "Batería fuera de rango";
         }
-        if (p.Bat is { } b && !In(b.Lvl, 0, 1)) return "Nivel de batería fuera de [0,1]";
         if (p.Mot is { } m)
         {
             if (m.Mag is { Length: > 256 }) return "mot.mag admite como máximo 256 muestras";
@@ -34,13 +33,21 @@ public static class PayloadValidator
             if (m.Rms is < 0 || m.Peak is < 0) return "Movimiento fuera de rango";
             if (m.Mag?.Any(x => !double.IsFinite(x) || Math.Abs(x) > 1000) == true) return "mot.mag fuera de rango";
         }
+        if (!Vec(p.Lin, 200) || !Vec(p.Grv, 20) || !Vec(p.Gyr, 100)) return "Movimiento fuera de rango";
+        if (!Vec(p.Mfl, 5000)) return "Campo magnético fuera de rango";
+        if (p.Ori is { } o && (!In(o.Az, 0, 360) || !In(o.Pi, -180, 180) || !In(o.Ro, -180, 180))) return "Orientación fuera de rango";
+        if (p.Env is { } env && (env.Lux is < 0 or > 200_000 || env.Prx is < 0 or > 1000 || env.Hpa is < 100 or > 1200
+                                   || env.Tmp is < -60 or > 100 || env.Hum is < 0 or > 100)) return "Sensor de entorno fuera de rango";
+        if (p.Stp is { N: < 0 }) return "Pasos fuera de rango";
         if (p.Net?.Probe is { } pr && (pr.Loss is < 0 or > 1 || pr.Rtt is < 0 || pr.Jit is < 0 || pr.Kbps is < 0)) return "Sondeo fuera de rango";
-        if (p.Wifi is { } w && (w.Rssi is < -127 or > 0 || w.Freq is < 2000 or > 7200 || w.Link is < 0)) return "Wi-Fi fuera de rango";
+        if (p.Wifi is { } w && (w.Rssi is < -127 or > 0 || w.Freq is < 2000 or > 7200 || w.Link is < 0 || w.Tx is < 0 || w.Rx is < 0)) return "Wi-Fi fuera de rango";
         if (p.Cell is { } c && (c.Dbm is < -160 or > 0 || c.Rsrp is < -160 or > 0 || c.Level is < 0 or > 4)) return "Celular fuera de rango";
         return null;
     }
 
     private static bool In(double v, double lo, double hi) => double.IsFinite(v) && v >= lo && v <= hi;
+
+    private static bool Vec(Vec3? v, double max) => v is null || (In(v.X, -max, max) && In(v.Y, -max, max) && In(v.Z, -max, max));
 }
 
 public static class ReadingMapper
@@ -53,11 +60,10 @@ public static class ReadingMapper
         Seq = (long)env.Seq,
         SessionId = env.Sid,
         Src = p.Src,
-        Lat = p.Gps?.Lat,
-        Lon = p.Gps?.Lon,
-        Acc = p.Gps?.Acc,
-        Spd = p.Gps?.Spd,
         AccRms = p.Mot?.Rms,
+        GyrNorm = p.Gyr?.Norm(),
+        Lux = p.Env?.Lux,
+        Hpa = p.Env?.Hpa,
         BatLvl = p.Bat?.Lvl,
         NetType = p.Net?.Type,
         ProbeRtt = p.Net?.Probe?.Rtt,
@@ -69,24 +75,35 @@ public static class ReadingMapper
     };
 }
 
-/// <summary>Flattened reading sent to dashboards (REST and SignalR).</summary>
+/// <summary>
+/// Reading sent to dashboards (REST and SignalR): the flattened columns used by the charts, the analytics of the
+/// moment (EMA, trends, z-scores) and the full decrypted payload <c>P</c> for the live panel.
+/// </summary>
 public sealed record ReadingDto(
     string DeviceId, long Ts, long TsServer, long Seq, string Src,
-    double? Lat, double? Lon, double? Acc, double? Spd, double? AccRms, double? AccPeak,
+    double? AccRms, double? AccPeak, double? GyrNorm, double? Lux, double? Hpa,
     double? BatLvl, bool? BatChg, string? NetType, string? NetEff,
     double? ProbeRtt, double? ProbeJit, double? ProbeLoss, double? ProbeKbps,
     int? WifiRssi, int? WifiFreq, int? CellDbm, string? CellType, bool? Visible,
-    double? RmsEma, double? RttEma, double? RssiEma, double? Speed, double? DistanceM,
-    double? BatSlopeH, double? BatEtaMin, double? RssiSlopeMin)
+    double? RmsEma, double? RttEma, double? RssiEma,
+    double? BatSlopeH, double? BatEtaMin, double? RssiSlopeMin, Dictionary<string, double>? Z, TelemetryPayload? P)
 {
     public static ReadingDto From(Reading r, TelemetryPayload? p, AnalyticsResult? a) => new(
         r.DeviceId.ToString("D"), r.TsDevice, r.TsServer, r.Seq, r.Src,
-        r.Lat, r.Lon, r.Acc, r.Spd, r.AccRms, p?.Mot?.Peak,
+        r.AccRms, p?.Mot?.Peak, r.GyrNorm, r.Lux, r.Hpa,
         r.BatLvl, p?.Bat?.Chg, r.NetType, p?.Net?.Eff,
         r.ProbeRtt, p?.Net?.Probe?.Jit, r.ProbeLoss, p?.Net?.Probe?.Kbps,
         r.WifiRssi, p?.Wifi?.Freq, r.CellDbm, r.CellType, p?.App?.Vis,
-        a?.RmsEma, a?.RttEma, a?.RssiEma, a?.DerivedSpeed ?? r.Spd, a?.TrackLengthM,
-        a?.BatterySlopePerHour, a?.BatteryEtaMinutes, a?.RssiSlopePerMinute);
+        a?.RmsEma, a?.RttEma, a?.RssiEma,
+        a?.BatterySlopePerHour, a?.BatteryEtaMinutes, a?.RssiSlopePerMinute, a is { Z.Count: > 0 } ? a.Z : null, WithoutSpectrum(p));
+
+    /// <summary>The magnitude window (up to 256 numbers) is only needed for the spectrum, which travels separately.</summary>
+    private static TelemetryPayload? WithoutSpectrum(TelemetryPayload? p)
+    {
+        if (p?.Mot?.Mag is null) return p;
+        p.Mot.Mag = null;
+        return p;
+    }
 }
 
 /// <summary>Optional encryption at rest of Readings.Json with AES-256-GCM (Storage:EncryptAtRest).</summary>

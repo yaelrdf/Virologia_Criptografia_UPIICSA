@@ -38,7 +38,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     public async Task Telemetry_Success_Then_ReadingVisible()
     {
         var dev = await ReadyDevice();
-        var r = await dev.Send(dev.Seal(TestDevice.Payload(0, ",\"gps\":{\"lat\":19.43,\"lon\":-99.13},\"bat\":{\"lvl\":0.8}").Replace("\"t\":0", "\"t\":$T")));
+        var r = await dev.Send(dev.Seal(TestDevice.Payload(0, ",\"env\":{\"lux\":321.5,\"hpa\":779.2},\"ori\":{\"az\":90,\"pi\":-5,\"ro\":2},\"bat\":{\"lvl\":0.8}").Replace("\"t\":0", "\"t\":$T")));
         Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
         Assert.Equal(1UL, (await r.Content.ReadFromJsonAsync<TelemetryAck>())!.Ack);
 
@@ -46,7 +46,8 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var req = new HttpRequestMessage(HttpMethod.Get, $"/api/readings?deviceId={dev.DeviceId}");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
         var list = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(19.43, list[0].GetProperty("lat").GetDouble());
+        Assert.Equal(321.5, list[0].GetProperty("lux").GetDouble());
+        Assert.Equal(90, list[0].GetProperty("p").GetProperty("ori").GetProperty("az").GetDouble());
     }
 
     [Fact]
@@ -98,7 +99,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     public async Task InvalidPayload_422_And_SeqNotConsumed()
     {
         var dev = await ReadyDevice();
-        var bad = dev.Seal("{\"t\":$T,\"src\":\"sim\",\"gps\":{\"lat\":200,\"lon\":0}}", seq: 1);
+        var bad = dev.Seal("{\"t\":$T,\"src\":\"sim\",\"bat\":{\"lvl\":7}}", seq: 1);
         var r = await dev.Send(bad);
         Assert.Equal((HttpStatusCode)422, r.StatusCode);
         Assert.Equal("invalid_payload", await TestDevice.Code(r));
@@ -183,8 +184,14 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
         var enroll = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
         var code = enroll.GetProperty("code").GetString()!;
-        Assert.Contains(code, enroll.GetProperty("qr").GetString());
-        var first = await http.PostAsJsonAsync("/api/enroll/redeem", new { code, name = "phone", kind = "android" });
+        // The QR is an ordinary URL that opens the web agent; code and fingerprint travel in the fragment.
+        var qr = new Uri(enroll.GetProperty("qr").GetString()!);
+        Assert.Equal("/agent.html", qr.AbsolutePath);
+        var fragment = $"#enroll={code}&fp={enroll.GetProperty("fingerprint").GetString()}";
+        // Without a public URL the QR points to the LAN HTTPS endpoint and also pins its self-signed certificate.
+        if (enroll.TryGetProperty("tls", out var tls)) fragment += $"&tls={tls.GetString()}";
+        Assert.Equal(fragment, qr.Fragment);
+        var first = await http.PostAsJsonAsync("/api/enroll/redeem", new { code, name = "phone", kind = "web" });
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var second = await http.PostAsJsonAsync("/api/enroll/redeem", new { code, name = "phone", kind = "android" });
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
@@ -197,7 +204,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/lab/ycm1-attack") { Content = JsonContent.Create(new { }) };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
         var r = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("{\"gps\":{\"lat\":19.5046,\"lon\":-99.1468}}", r.GetProperty("recoveredPlaintext").GetString());
+        Assert.Equal("{\"env\":{\"lux\":412,\"hpa\":779.3},\"ori\":{\"az\":87,\"pi\":-12,\"ro\":3}}", r.GetProperty("recoveredPlaintext").GetString());
     }
 
     [Fact]

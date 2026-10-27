@@ -117,7 +117,6 @@ public sealed class TelemetryPipeline(
         if (payload.Wifi?.Rssi is { } rssi) device.LastRssi = rssi;
         else if (payload.Cell?.Dbm is { } dbm) device.LastRssi = dbm;
         var result = analytics.OnReading(device, payload, reading);
-        foreach (var a in result.Alerts) db.Alerts.Add(a);
         await db.SaveChangesAsync(ct);
 
         // 9) Broadcast.
@@ -126,7 +125,6 @@ public sealed class TelemetryPipeline(
         traces.Add(trace);
         await live.Reading(device.Id, ReadingDto.From(reading, payload, result));
         await live.DeviceStatus(device, online: true);
-        foreach (var a in result.Alerts) await live.Alert(a, device);
         if (result.Spectrum is { } sp) await live.Spectrum(device.Id, sp);
         await live.PacketTrace(trace);
         log.LogDebug("Packet ok did={Did} seq={Seq}", env.Did, env.Seq);

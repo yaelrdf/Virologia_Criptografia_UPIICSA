@@ -14,6 +14,18 @@ using SignalTrace.Server.Services;
 var builder = WebApplication.CreateBuilder(args);
 var cfg = builder.Configuration;
 
+// LAN HTTPS (phones need a secure context): keep the configured HTTP address(es) and add https://0.0.0.0:{Https:Port}.
+var lanHttps = new LanHttps(cfg, new ServerPaths(cfg, builder.Environment));
+builder.Services.AddSingleton(lanHttps);
+if (lanHttps.Enabled)
+{
+    var urls = cfg["urls"] ?? (cfg["http_ports"] is { Length: > 0 } ports
+        ? string.Join(';', ports.Split(';').Select(p => $"http://*:{p}"))
+        : "http://localhost:5000");
+    builder.WebHost.UseUrls($"{urls};https://0.0.0.0:{lanHttps.Port}");
+    builder.WebHost.ConfigureKestrel(k => k.ConfigureHttpsDefaults(h => h.ServerCertificate = lanHttps.Certificate));
+}
+
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
@@ -29,10 +41,7 @@ builder.Services.AddSingleton<AnalyticsEngine>();
 builder.Services.AddSingleton<TraceStore>();
 builder.Services.AddSingleton<AtRestProtector>();
 builder.Services.AddSingleton<EnrollmentCodes>();
-builder.Services.AddSingleton<AlertWebhook>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AlertWebhook>());
 builder.Services.AddHostedService<DeviceMonitor>();
-builder.Services.AddHttpClient("webhook", c => c.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<LiveBroadcaster>();
 builder.Services.AddScoped<TelemetryPipeline>();
 if (cfg.GetValue("Mqtt:Enabled", false)) builder.Services.AddHostedService<MqttBridge>();
@@ -126,21 +135,19 @@ static async Task Bootstrap(WebApplication app)
     await db.Database.EnsureCreatedAsync();
     var identity = app.Services.GetRequiredService<ServerIdentity>();
     app.Logger.LogInformation("Server key fingerprint (SHA-256): {Fingerprint}", identity.Fingerprint);
-    if (await db.Users.AnyAsync()) return;
-    // First start: create the admin. The password comes from Admin:Password or is printed once.
+    if (await db.Users.AnyAsync(u => u.Role == Roles.Admin)) return;
+    // First start: create the admin with the fixed password from configuration (Admin:Password, default in appsettings.json).
+    var username = cfg["Admin:Username"] ?? "admin";
     var password = cfg["Admin:Password"];
-    var generated = string.IsNullOrEmpty(password);
-    if (generated) password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(12)).Replace('/', 'x').Replace('+', 'y');
-    var hasher = app.Services.GetRequiredService<PasswordHasher>();
-    var (salt, it, hash) = hasher.Hash(password!);
+    if (string.IsNullOrEmpty(password)) throw new InvalidOperationException("Admin:Password no está configurada.");
+    var (salt, it, hash) = app.Services.GetRequiredService<PasswordHasher>().Hash(password);
     db.Users.Add(new User
     {
-        Username = cfg["Admin:Username"] ?? "admin", Salt = salt, Iterations = it, PasswordHash = hash, Role = Roles.Admin,
+        Username = username, Salt = salt, Iterations = it, PasswordHash = hash, Role = Roles.Admin,
         CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
     });
     await db.SaveChangesAsync();
-    if (generated)
-        Console.WriteLine($"\n==== Usuario inicial: {cfg["Admin:Username"] ?? "admin"} / contraseña: {password} (se muestra una sola vez) ====\n");
+    app.Logger.LogWarning("Created initial admin '{User}' with the configured password; change it from Usuarios.", username);
 }
 
 public partial class Program;

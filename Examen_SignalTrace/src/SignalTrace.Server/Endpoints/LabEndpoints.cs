@@ -8,7 +8,7 @@ using SignalTrace.Server.Services;
 
 namespace SignalTrace.Server.Endpoints;
 
-/// <summary>Short-lived one-time enrollment codes, shown as a QR in the dashboard and redeemed by the Android app.</summary>
+/// <summary>Short-lived one-time enrollment codes, shown as a QR in the dashboard and redeemed by the web agent or the Android app.</summary>
 public sealed class EnrollmentCodes(TimeProvider clock)
 {
     private readonly ConcurrentDictionary<string, (int UserId, DateTimeOffset Expires)> _codes = new();
@@ -46,13 +46,19 @@ public static class LabEndpoints
 
     public static void MapEnrollment(this WebApplication app)
     {
-        app.MapPost("/api/enroll", (HttpContext ctx, ClaimsPrincipal me, EnrollmentCodes codes, ServerIdentity id, IConfiguration cfg) =>
+        app.MapPost("/api/enroll", (HttpContext ctx, ClaimsPrincipal me, EnrollmentCodes codes, ServerIdentity id, IConfiguration cfg, LanHttps lan) =>
         {
             var (code, exp) = codes.Create(me.UserId());
-            var url = cfg["Server:PublicUrl"] is { Length: > 0 } pub ? pub.TrimEnd('/') : $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-            // QR content: compact JSON the app parses to fill url, pinned fingerprint and code.
-            var qr = $$"""{"st":1,"url":"{{url}}","fp":"{{id.Fingerprint}}","code":"{{code}}"}""";
-            return Results.Ok(new { code, expiresAt = exp.ToUnixTimeMilliseconds(), url, fingerprint = id.Fingerprint, qr });
+            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+            // Base URL a phone can open: the public URL, else this HTTPS origin, else the LAN HTTPS address.
+            var url = cfg["Server:PublicUrl"] is { Length: > 0 } pub ? pub.TrimEnd('/')
+                : ctx.Request.IsHttps || lan.LanUrl is null ? origin
+                : lan.LanUrl;
+            var pinTls = lan.CertSha256 is not null && cfg["Server:PublicUrl"] is not { Length: > 0 } && url.StartsWith("https://", StringComparison.Ordinal);
+            // QR content: an ordinary URL. Any phone camera opens the web agent; the Android app reads the same link.
+            // The fragment (#…) never reaches the server: code, pinned key fingerprint and TLS certificate hash.
+            var qr = $"{url}/agent.html#enroll={code}&fp={id.Fingerprint}" + (pinTls ? $"&tls={lan.CertSha256}" : "");
+            return Results.Ok(new { code, expiresAt = exp.ToUnixTimeMilliseconds(), url, fingerprint = id.Fingerprint, tls = pinTls ? lan.CertSha256 : null, qr });
         }).RequireAuthorization("user");
 
         app.MapPost("/api/enroll/redeem", async (EnrollRedeemRequest req, EnrollmentCodes codes, AppDb db, TokenService tokens, TimeProvider clock) =>
@@ -97,7 +103,7 @@ public static class LabEndpoints
         lab.MapPost("/ycm1-attack", (Ycm1AttackRequest req) =>
         {
             var p1 = Encoding.UTF8.GetBytes(req.Plaintext ?? "{\"t\":1760000000000,\"src\":\"sim\",\"bat\":{\"lvl\":0.5}}");
-            var p2 = Encoding.UTF8.GetBytes(req.SecondPlaintext ?? "{\"gps\":{\"lat\":19.5046,\"lon\":-99.1468}}");
+            var p2 = Encoding.UTF8.GetBytes(req.SecondPlaintext ?? "{\"env\":{\"lux\":412,\"hpa\":779.3},\"ori\":{\"az\":87,\"pi\":-12,\"ro\":3}}");
             var secret = YaelCryptoMarch1.DeriveParams(RandomNumberGenerator.GetBytes(32), 1, rounds: 1);
             var c1 = YaelCryptoMarch1.EncryptWithParams(p1, secret);
             var c2 = YaelCryptoMarch1.EncryptWithParams(p2, secret);

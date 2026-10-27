@@ -11,6 +11,9 @@ public sealed record LoginRequest(string Username, string Password);
 public sealed record LoginResponse(string Token, long ExpiresAt, string Role, string Username);
 
 public sealed record CreateUserRequest(string Username, string Password, string Role);
+public sealed record ChangeRoleRequest(string Role);
+public sealed record ChangePasswordRequest(string? Current, string? New);
+public sealed record ResetPasswordResponse(string Username, string Password);
 
 public sealed record ServerKeyResponse(string PublicKey, string Fingerprint, string[] Suites);
 
@@ -31,14 +34,26 @@ public static class Json
     };
 }
 
-// Telemetry payload v1 (PLAN §8). Every field except T and Src is optional.
+// Telemetry payload v2: the sensor bank. Every block except T and Src is optional; a device only sends the
+// sensors its user chose to expose. There is no location data (no GPS, SSID, BSSID or cell identifiers).
 
 public sealed class TelemetryPayload
 {
     public long T { get; set; }
     public string Src { get; set; } = "";
-    public GpsData? Gps { get; set; }
+    /// <summary>Accelerometer (with gravity), m/s², plus the magnitude window used for the spectrum.</summary>
     public MotionData? Mot { get; set; }
+    /// <summary>Linear acceleration (without gravity), m/s².</summary>
+    public Vec3? Lin { get; set; }
+    /// <summary>Gravity vector, m/s².</summary>
+    public Vec3? Grv { get; set; }
+    /// <summary>Gyroscope, rad/s.</summary>
+    public Vec3? Gyr { get; set; }
+    /// <summary>Magnetic field, µT.</summary>
+    public Vec3? Mfl { get; set; }
+    public OrientationData? Ori { get; set; }
+    public EnvData? Env { get; set; }
+    public StepData? Stp { get; set; }
     public BatteryData? Bat { get; set; }
     public NetData? Net { get; set; }
     public WifiData? Wifi { get; set; }
@@ -46,14 +61,12 @@ public sealed class TelemetryPayload
     public AppData? App { get; set; }
 }
 
-public sealed class GpsData
+public sealed class Vec3
 {
-    public double Lat { get; set; }
-    public double Lon { get; set; }
-    public double? Acc { get; set; }
-    public double? Alt { get; set; }
-    public double? Spd { get; set; }
-    public double? Hdg { get; set; }
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Z { get; set; }
+    public double Norm() => Math.Sqrt(X * X + Y * Y + Z * Z);
 }
 
 public sealed class MotionData
@@ -67,10 +80,39 @@ public sealed class MotionData
     public double[]? Mag { get; set; }
 }
 
+/// <summary>Device orientation in degrees: azimuth [0,360), pitch [-180,180], roll [-90,90] (W3C alpha/beta/gamma).</summary>
+public sealed class OrientationData
+{
+    public double Az { get; set; }
+    public double Pi { get; set; }
+    public double Ro { get; set; }
+}
+
+/// <summary>Environment sensors: illuminance (lx), proximity (cm), pressure (hPa), temperature (°C), relative humidity (%).</summary>
+public sealed class EnvData
+{
+    public double? Lux { get; set; }
+    public double? Prx { get; set; }
+    public double? Hpa { get; set; }
+    public double? Tmp { get; set; }
+    public double? Hum { get; set; }
+}
+
+/// <summary>Steps counted since the transmission started.</summary>
+public sealed class StepData
+{
+    public long N { get; set; }
+}
+
 public sealed class BatteryData
 {
     public double Lvl { get; set; }
     public bool? Chg { get; set; }
+    /// <summary>Battery temperature (°C), voltage (V), health and power source (Android only).</summary>
+    public double? Temp { get; set; }
+    public double? Volt { get; set; }
+    public string? Health { get; set; }
+    public string? Plug { get; set; }
 }
 
 public sealed class NetData
@@ -90,15 +132,17 @@ public sealed class ProbeData
     public double? Kbps { get; set; }
 }
 
+/// <summary>Wi-Fi link quality: RSSI (dBm), frequency (MHz), link/tx/rx speeds (Mbps). No SSID/BSSID.</summary>
 public sealed class WifiData
 {
     public int? Rssi { get; set; }
     public int? Freq { get; set; }
     public int? Link { get; set; }
-    public string? Ssid { get; set; }
-    public string? Bssid { get; set; }
+    public int? Tx { get; set; }
+    public int? Rx { get; set; }
 }
 
+/// <summary>Cellular signal strength. No cell identifiers (MCC/MNC/CID/TAC).</summary>
 public sealed class CellData
 {
     public string? Type { get; set; }
@@ -107,10 +151,6 @@ public sealed class CellData
     public int? Rsrp { get; set; }
     public int? Rsrq { get; set; }
     public double? Snr { get; set; }
-    public int? Mcc { get; set; }
-    public int? Mnc { get; set; }
-    public long? Cid { get; set; }
-    public int? Tac { get; set; }
 }
 
 public sealed class AppData

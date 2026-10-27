@@ -140,16 +140,4 @@ public static class Numeric
         for (var i = 0; i < n; i++) { ssTot += (y[i] - my) * (y[i] - my); ssRes += Math.Pow(y[i] - (a + b * x[i]), 2); }
         return (a, b, ssTot < 1e-12 ? 1 : 1 - ssRes / ssTot);
     }
-
-    public const double EarthRadiusM = 6_371_000;
-
-    /// <summary>Great-circle distance with the Haversine formula, in metres.</summary>
-    public static double Haversine(double lat1, double lon1, double lat2, double lon2)
-    {
-        static double Rad(double d) => d * Math.PI / 180;
-        var dLat = Rad(lat2 - lat1);
-        var dLon = Rad(lon2 - lon1);
-        var h = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) + Math.Cos(Rad(lat1)) * Math.Cos(Rad(lat2)) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-        return 2 * EarthRadiusM * Math.Asin(Math.Min(1, Math.Sqrt(h)));
-    }
 }

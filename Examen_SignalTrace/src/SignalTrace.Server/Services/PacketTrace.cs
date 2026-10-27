@@ -37,8 +37,6 @@ public sealed class PacketTraceDto
     public string? Ciphertext { get; set; }
     public string? Tag { get; set; }
     public double? CiphertextEntropy { get; set; }
-    public string? CaesarHex { get; set; }
-    public double? CaesarEntropy { get; set; }
     public Dictionary<string, double> Micros { get; set; } = [];
     public Dictionary<string, string>? Keys { get; set; }
 
@@ -48,10 +46,6 @@ public sealed class PacketTraceDto
         {
             t.PlaintextEntropy = Entropy.Shannon(d.Plaintext);
             if (exposePlaintext) t.PlaintextJson = Encoding.UTF8.GetString(d.Plaintext);
-            // Didactic contrast: what a classical Caesar shift would leave on the wire.
-            var caesar = Caesar.Encrypt(d.Plaintext, 3);
-            t.CaesarHex = Bytes.ToHex(caesar.AsSpan(0, Math.Min(caesar.Length, 512)));
-            t.CaesarEntropy = Entropy.Shannon(caesar);
         }
         if (d.Ycm1Params is { } p)
             t.Ycm1Params = new { seed = p.Seed, rounds = p.Rounds.Select(r => new { k = r.K, m = r.M, rot = r.Rot }) };

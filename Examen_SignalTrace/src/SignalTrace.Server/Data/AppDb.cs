@@ -43,11 +43,10 @@ public sealed class Reading
     public long Seq { get; set; }
     public string SessionId { get; set; } = "";
     public string Src { get; set; } = "";
-    public double? Lat { get; set; }
-    public double? Lon { get; set; }
-    public double? Acc { get; set; }
-    public double? Spd { get; set; }
     public double? AccRms { get; set; }
+    public double? GyrNorm { get; set; }
+    public double? Lux { get; set; }
+    public double? Hpa { get; set; }
     public double? BatLvl { get; set; }
     public string? NetType { get; set; }
     public double? ProbeRtt { get; set; }
@@ -74,30 +73,17 @@ public sealed class Packet
     public string? CtB64 { get; set; }
 }
 
-public sealed class Alert
-{
-    public long Id { get; set; }
-    public Guid DeviceId { get; set; }
-    public long Ts { get; set; }
-    public string Kind { get; set; } = "";
-    public double? Value { get; set; }
-    public string Message { get; set; } = "";
-    public bool Acknowledged { get; set; }
-}
-
 public sealed class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<Reading> Readings => Set<Reading>();
     public DbSet<Packet> Packets => Set<Packet>();
-    public DbSet<Alert> Alerts => Set<Alert>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
         b.Entity<Reading>().HasIndex(r => new { r.DeviceId, r.TsDevice });
         b.Entity<Packet>().HasIndex(p => new { p.DeviceId, p.TsServer });
-        b.Entity<Alert>().HasIndex(a => new { a.DeviceId, a.Ts });
     }
 }

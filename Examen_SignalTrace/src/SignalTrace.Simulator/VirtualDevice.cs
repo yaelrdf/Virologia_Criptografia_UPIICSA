@@ -20,8 +20,8 @@ public sealed class Stats
 }
 
 /// <summary>
-/// One simulated device: realistic synthetic telemetry (route, 2–7 Hz vibration, RSSI and RTT with drift and
-/// optional anomalies, draining battery) sealed with the real protocol and sent over HTTP or MQTT, in series.
+/// One simulated device: realistic synthetic telemetry for the whole sensor bank (2–7 Hz vibration, slowly turning
+/// orientation, light, pressure, steps, RSSI and RTT with drift and optional anomalies, draining battery) sealed with the real protocol and sent over HTTP or MQTT, in series.
 /// </summary>
 public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt, HttpClient http, byte[] pinnedKey, Stats stats)
 {
@@ -30,7 +30,8 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
     private string? _sid;
     private ulong _seq;
     private long _packets;
-    private double _lat = 19.3955 + 0.002 * Math.Sin(index), _lon = -99.0915 + 0.002 * Math.Cos(index), _hdg = index * 37 % 360;
+    private double _az = index * 37 % 360, _lux = 250 + 40 * index, _hpa = 779 + index % 5, _tmp = 22 + index % 4;
+    private long _steps;
     private double _bat = 0.95 - 0.03 * (index % 10), _rssi = -55 - index % 15, _rtt = 35 + index % 20;
     private readonly double _vibHz = 2 + index % 6;
     private double _t;
@@ -140,11 +141,11 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
     {
         var dt = 1 / opt.Rate;
         _packets++;
-        _hdg = (_hdg + 15 * Gauss() + 360) % 360;
-        var spd = Math.Max(0, 1.4 + 0.4 * Gauss());
-        var d = spd * dt;
-        _lat += d * Math.Cos(_hdg * Math.PI / 180) / 111_320;
-        _lon += d * Math.Sin(_hdg * Math.PI / 180) / (111_320 * Math.Cos(_lat * Math.PI / 180));
+        _az = (_az + 4 * Gauss() + 360) % 360;
+        _lux = Math.Clamp(_lux + 15 * Gauss() + 0.02 * (300 - _lux), 0, 2000);
+        _hpa += 0.01 * Gauss() + 0.002 * (779 - _hpa);
+        _tmp += 0.02 * Gauss() + 0.01 * (23 - _tmp);
+        _steps += _rnd.NextDouble() < 0.6 ? (long)Math.Round(1.8 * dt + Math.Abs(Gauss())) : 0;
         _bat = Math.Max(0.02, _bat - 0.00004 * dt * (1 + index % 3)); // ≈ 0.25–0.7 %/min
         _rssi = Math.Clamp(_rssi + 0.8 * Gauss() + 0.05 * (-60 - _rssi), -98, -35);
         _rtt = Math.Max(5, _rtt + 2 * Gauss() + 0.1 * (40 - _rtt));
@@ -167,12 +168,20 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         {
             T = ts,
             Src = "sim",
-            Gps = new GpsData { Lat = Math.Round(_lat, 6), Lon = Math.Round(_lon, 6), Acc = Math.Round(4 + 2 * _rnd.NextDouble(), 1), Spd = Math.Round(spd, 2), Hdg = Math.Round(_hdg) },
             Mot = new MotionData { Ax = 0.02, Ay = -0.01, Az = Math.Round(mean, 3), Rms = Math.Round(rms, 4), Peak = Math.Round(mag.Max(v => Math.Abs(v - mean)), 4), Fs = fs, Mag = _packets % 5 == 0 ? mag : null },
-            Bat = new BatteryData { Lvl = Math.Round(_bat, 3), Chg = false },
+            Lin = V(0.3 * Gauss(), 0.3 * Gauss(), mean - 9.81),
+            Grv = V(0.05, -0.02, 9.80),
+            Gyr = V(0.02 * Gauss(), 0.02 * Gauss(), 0.07 * Gauss()),
+            Mfl = V(22 * Math.Cos(_az * Math.PI / 180), -22 * Math.Sin(_az * Math.PI / 180), -38 + Gauss()),
+            Ori = new OrientationData { Az = Math.Round(_az, 1), Pi = Math.Round(-2 + Gauss(), 1), Ro = Math.Round(1 + Gauss(), 1) },
+            Env = new EnvData { Lux = Math.Round(_lux), Prx = 5, Hpa = Math.Round(_hpa, 2), Tmp = Math.Round(_tmp, 1), Hum = Math.Round(45 + 3 * Math.Sin(_t / 60), 1) },
+            Stp = new StepData { N = _steps },
+            Bat = new BatteryData { Lvl = Math.Round(_bat, 3), Chg = false, Temp = Math.Round(29 + _tmp / 10, 1), Volt = Math.Round(3.6 + 0.5 * _bat, 3), Health = "good", Plug = "none" },
             Net = new NetData { Type = "wifi", Probe = new ProbeData { Rtt = Math.Round(rtt, 1), Jit = Math.Round(Math.Abs(2 * Gauss()), 1), Loss = anomaly ? 0.2 : 0 } },
-            Wifi = new WifiData { Rssi = (int)Math.Round(rssi), Freq = index % 2 == 0 ? 5180 : 2437, Link = 433 },
-            App = new AppData { Vis = true, Ver = "sim-1.0" },
+            Wifi = new WifiData { Rssi = (int)Math.Round(rssi), Freq = index % 2 == 0 ? 5180 : 2437, Link = 433, Tx = 433, Rx = 390 },
+            App = new AppData { Vis = true, Ver = "sim-2.0" },
         };
     }
+
+    private static Vec3 V(double x, double y, double z) => new() { X = Math.Round(x, 3), Y = Math.Round(y, 3), Z = Math.Round(z, 3) };
 }

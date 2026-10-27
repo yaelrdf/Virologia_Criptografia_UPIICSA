@@ -9,7 +9,7 @@ namespace SignalTrace.Server.Hubs;
 
 /// <summary>
 /// /hubs/live — user JWT. Groups: "users" (everybody), "admin" (packet traces), "device:{id}" (readings of one device).
-/// Server → client: Reading, DeviceStatus, Alert, Spectrum, PacketTrace. Client → server: Subscribe, Unsubscribe.
+/// Server → client: Reading, DeviceStatus, Spectrum, PacketTrace. Client → server: Subscribe, Unsubscribe.
 /// </summary>
 [Authorize(Policy = "user")]
 public sealed class LiveHub(AppDb db) : Hub
@@ -36,12 +36,7 @@ public sealed class LiveHub(AppDb db) : Hub
 
 public sealed record DeviceStatusDto(string DeviceId, string Name, string Kind, bool Online, long? LastSeen, double? Battery, int? LastRssi);
 
-public sealed record AlertDto(long Id, string DeviceId, string DeviceName, long Ts, string Kind, double? Value, string Message, bool Acknowledged)
-{
-    public static AlertDto From(Alert a, string deviceName) => new(a.Id, a.DeviceId.ToString("D"), deviceName, a.Ts, a.Kind, a.Value, a.Message, a.Acknowledged);
-}
-
-public sealed class LiveBroadcaster(IHubContext<LiveHub> hub, IConfiguration cfg, AlertWebhook webhook)
+public sealed class LiveBroadcaster(IHubContext<LiveHub> hub, IConfiguration cfg)
 {
     private readonly bool _console = cfg.GetValue("Console:Enabled", true);
 
@@ -52,13 +47,6 @@ public sealed class LiveBroadcaster(IHubContext<LiveHub> hub, IConfiguration cfg
     public Task DeviceStatus(Device d, bool online)
         => hub.Clients.Group("users").SendAsync("DeviceStatus", d.Id.ToString("D"),
             new DeviceStatusDto(d.Id.ToString("D"), d.Name, d.Kind, online, d.LastSeenAt, d.LastBattery, d.LastRssi));
-
-    public async Task Alert(Alert a, Device d)
-    {
-        var dto = AlertDto.From(a, d.Name);
-        await hub.Clients.Group("users").SendAsync("Alert", dto);
-        webhook.Enqueue(dto);
-    }
 
     public Task Spectrum(Guid deviceId, SpectrumResult s)
         => hub.Clients.Group(DeviceGroup(deviceId)).SendAsync("Spectrum", deviceId.ToString("D"), s.Freqs, s.Mags, s.DominantHz);

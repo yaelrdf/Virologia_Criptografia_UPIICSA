@@ -1,4 +1,4 @@
-# Local container test:  ADMIN_PASSWORD=... docker compose -f deploy/docker-compose.yml up --build
+# Local container test:  docker compose -f deploy/docker-compose.yml up --build
 services:
   signaltrace:
     build:
@@ -8,11 +8,10 @@ services:
       - "8080:8080"
       - "1883:1883"
     environment:
-      Admin__Password: ${ADMIN_PASSWORD:?Define ADMIN_PASSWORD (al menos 8 caracteres)}
+      Admin__Password: "${ADMIN_PASSWORD:-SignalTrace2026!}"
       Mqtt__Enabled: "true"
       Lab__Enabled: "${LAB_ENABLED:-true}"
       Storage__EncryptAtRest: "${ENCRYPT_AT_REST:-false}"
-      Alerts__WebhookUrl: "${ALERT_WEBHOOK:-}"
     volumes:
       - signaltrace-data:/app/data
 volumes:
