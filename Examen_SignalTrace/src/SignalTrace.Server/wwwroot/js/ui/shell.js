@@ -27,7 +27,10 @@ export function requireAuth({ admin = false } = {}) {
   return auth;
 }
 
-/** Top bar. minimal: only brand and theme (a phone linked by QR has no user session). */
+/**
+ * Top bar. On phones (< 760 px) the navigation collapses into a hamburger panel.
+ * minimal: only brand and theme (a phone linked by QR has no user session).
+ */
 export function renderShell(active, { minimal = false } = {}) {
   const auth = minimal ? null : getAuth();
   const bar = document.createElement("header");
@@ -36,7 +39,8 @@ export function renderShell(active, { minimal = false } = {}) {
     .map((p) => `<a href="${p.href}" ${p.href === active ? 'aria-current="page"' : ""}>${p.label}</a>`).join("");
   bar.innerHTML = `
     <a class="brand" href="${minimal ? "agent.html" : "app.html"}">${LOGO}<span>SignalTrace</span></a>
-    <nav class="nav" aria-label="Principal">${links}
+    ${minimal ? "" : `<button type="button" class="nav-toggle" aria-label="Menú" aria-expanded="false" aria-controls="main-nav">☰</button>`}
+    <nav class="nav${minimal ? " minimal" : ""}" id="main-nav" aria-label="Principal">${links}
       <select id="theme" aria-label="Tema" style="width:auto;min-height:34px;padding:4px 6px">
         <option value="auto">Tema: auto</option><option value="light">Claro</option><option value="dark">Oscuro</option>
       </select>
@@ -48,7 +52,26 @@ export function renderShell(active, { minimal = false } = {}) {
   sel.value = store.read("st.theme") || "auto";
   sel.onchange = () => { store.write("st.theme", sel.value); applyTheme(sel.value); };
   bar.querySelector("#logout")?.addEventListener("click", () => logout());
-  bar.querySelector("#pw-open")?.addEventListener("click", () => { bar.querySelector(".user-menu").open = false; changePasswordDialog(); });
+  bar.querySelector("#pw-open")?.addEventListener("click", () => { closeMenus(); changePasswordDialog(); });
+
+  // Hamburger panel (phones) and user dropdown: close on Escape, on a link, or on a click outside.
+  const toggle = bar.querySelector(".nav-toggle");
+  const userMenu = bar.querySelector(".user-menu");
+  function closeMenus() {
+    bar.classList.remove("nav-open");
+    toggle?.setAttribute("aria-expanded", "false");
+    if (userMenu) userMenu.open = false;
+  }
+  toggle?.addEventListener("click", () => {
+    const open = bar.classList.toggle("nav-open");
+    toggle.setAttribute("aria-expanded", String(open));
+  });
+  bar.querySelectorAll(".nav a").forEach((a) => a.addEventListener("click", closeMenus));
+  document.addEventListener("click", (e) => {
+    if (!bar.contains(e.target)) closeMenus();
+    else if (userMenu?.open && !userMenu.contains(e.target)) userMenu.open = false;
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
   registerServiceWorker();
 }
 

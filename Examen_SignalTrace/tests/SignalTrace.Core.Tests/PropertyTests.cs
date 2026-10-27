@@ -89,8 +89,8 @@ public class PropertyTests
         Assert.Equal(serverKeys.KSig, clientKeys.KSig);
 
         // MITM: a different signing key must be rejected.
-        using var mallory = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        Assert.Throws<CryptographicException>(() => client.Complete(resp, EcKeys.ExportPublic(mallory)));
+        using var attacker = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        Assert.Throws<CryptographicException>(() => client.Complete(resp, EcKeys.ExportPublic(attacker)));
     }
 
     [Fact]

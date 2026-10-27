@@ -3,23 +3,35 @@
   position: sticky; top: 0; z-index: 500; background: var(--surface); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 12px; padding: 8px 16px; flex-wrap: wrap;
 }
+.nav-toggle { display: none; margin-left: auto; min-height: 38px; min-width: 42px; padding: 4px 10px; font-size: 1.25rem; line-height: 1; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text); text-decoration: none; }
 .brand img, .brand svg { width: 30px; height: 30px; }
-.nav { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-left: auto; }
 .nav a { padding: 6px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: .92rem; }
 .nav a[aria-current="page"] { background: var(--surface-2); font-weight: 600; }
-.user-menu { display: flex; align-items: center; }
+.user-menu { position: relative; display: flex; align-items: center; }
 .user-menu summary { list-style: none; cursor: pointer; color: var(--muted); font-size: .85rem; padding: 6px 8px; border-radius: 8px; white-space: nowrap; }
 .user-menu summary::-webkit-details-marker { display: none; }
 .user-menu summary::after { content: " ▾"; }
 .user-menu[open] summary { background: var(--surface-2); color: var(--text); }
-.user-menu[open] summary::after { content: " ▸"; }
-.user-menu .menu { display: flex; gap: 4px; }
-.user-menu .menu button { min-height: 32px; padding: 4px 10px; font-size: .88rem; white-space: nowrap; }
+.user-menu[open] summary::after { content: " ▴"; }
+/* Dropdown below the user name. */
+.user-menu .menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 600; min-width: 190px;
+  display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+.user-menu .menu button { min-height: 34px; padding: 6px 10px; font-size: .9rem; white-space: nowrap; text-align: left; width: 100%; }
 @media (max-width: 759px) {
-  /* Phones: one scrollable row of links instead of three wrapped rows. */
-  .nav { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .nav a { white-space: nowrap; }
+  /* Phones: the navigation becomes a vertical panel opened with the hamburger button. */
+  .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .nav:not(.minimal) { display: none; width: 100%; margin-left: 0; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 0 4px; border-top: 1px solid var(--border); }
+  .topbar.nav-open .nav { display: flex; }
+  .nav a { padding: 10px 12px; }
+  .nav select { width: 100% !important; margin: 4px 0; }
+  .user-menu { flex-direction: column; align-items: stretch; }
+  .user-menu summary { padding: 10px 12px; }
+  .user-menu .menu { position: static; box-shadow: none; border: 0; padding: 0 0 0 12px; min-width: 0; }
 }
 
 main { padding: 16px; max-width: 1400px; margin: 0 auto; }
@@ -49,6 +61,13 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 
 .center-page { min-height: calc(100dvh - 60px); display: grid; place-items: center; padding: 16px; }
 .login-card { width: 100%; max-width: 400px; }
-.chart-box { position: relative; height: 220px; }
+.chart-box { position: relative; height: 220px; width: 100%; min-width: 0; }
+/* Grid and flex children must be allowed to shrink, or Chart.js keeps the canvas wider than the phone. */
+.grid > *, .stack > *, .chart-card { min-width: 0; }
+@media (max-width: 479px) {
+  .chart-box { height: 190px; }
+  .chart-card { padding: 12px; }
+  .chart-card h3 { font-size: .95rem; }
+}
 .map { height: 340px; border-radius: 10px; border: 1px solid var(--border); }
 @media (min-width: 760px) { .map { height: 440px; } }

@@ -12,6 +12,19 @@ function themeOptions() {
 }
 
 const timeTick = (v) => new Date(v).toLocaleTimeString("es-MX", { hour12: false });
+const narrow = () => matchMedia("(max-width: 479px)").matches;
+
+/** Phone-sized charts: fewer ticks, smaller legend, no axis titles. Re-applied when the width changes. */
+function fit(chart) {
+  const n = narrow();
+  const x = chart.options.scales.x, y = chart.options.scales.y;
+  x.ticks.maxTicksLimit = n ? 3 : chart.$xTicks;
+  x.ticks.font = y.ticks.font = { size: n ? 10 : 12 };
+  if (y.title) y.title.display = !n && !!y.title.text;
+  if (x.title) x.title.display = !n && !!x.title.text;
+  const legend = chart.options.plugins.legend;
+  if (legend.labels) Object.assign(legend.labels, { boxWidth: n ? 8 : 12, font: { size: n ? 10 : 12 } });
+}
 
 /**
  * Line chart over time. datasets: [{ label, color, dashed?, fill?, marks? }]; marks draws only points (no line),
@@ -42,6 +55,9 @@ export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = 
     },
   });
   chart.$max = max;
+  chart.$xTicks = 6;
+  fit(chart);
+  chart.update("none");
   charts.add(chart);
   return chart;
 }
@@ -61,6 +77,9 @@ export function xyChart(canvas, label, color, { xLabel = "", yLabel = "" } = {})
       plugins: { legend: { display: false } },
     },
   });
+  chart.$xTicks = 9;
+  fit(chart);
+  chart.update("none");
   charts.add(chart);
   return chart;
 }
@@ -76,6 +95,8 @@ export function push(chart, i, x, y, max = chart.$max ?? 300) {
 export function clear(chart) { chart.data.datasets.forEach((d) => (d.data = [])); chart.update(); }
 
 export function destroyAll() { charts.forEach((c) => c.destroy()); charts.clear(); }
+
+matchMedia("(max-width: 479px)").addEventListener("change", () => { for (const c of charts) { fit(c); c.update("none"); } });
 
 addEventListener("st-theme", () => {
   const { text, grid } = themeOptions();

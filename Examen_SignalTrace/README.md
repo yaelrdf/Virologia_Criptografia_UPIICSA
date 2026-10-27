@@ -118,7 +118,7 @@ Notas:
 ## Consola, laboratorio y usuarios (solo admin)
 
 - **`console.html`:** cada paquete aceptado o rechazado llega por SignalR. Se muestra por etapas:
-  - bytes en el cable;
+  - bytes transmitidos;
   - verificación;
   - nonce, AAD y etiqueta del AEAD;
   - Yael Crypto March1 ronda por ronda, con k, m, rot, la matriz K y los bytes que cambian;
@@ -127,11 +127,11 @@ Notas:
   Incluye la entropía por etapa y una animación «Paso a paso».
 - **`lab.html`:** «Ejecutar todos» corre 12 escenarios con un dispositivo de laboratorio real y los compara con el resultado esperado:
   - normal;
-  - Eve;
-  - bit flip;
-  - replay;
+  - escucha pasiva;
+  - modificación (bit flip);
+  - reenvío (replay);
   - AAD alterado;
-  - MITM;
+  - intermediario (MITM);
   - sesión perdida;
   - contenido inválido;
   - token ajeno;

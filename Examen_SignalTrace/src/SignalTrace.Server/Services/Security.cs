@@ -143,8 +143,8 @@ public sealed class ServerIdentity : IDisposable
     public ECDsa Key { get; }
     public byte[] PublicKey { get; }
     public string Fingerprint { get; }
-    private readonly Lazy<ECDsa> _mallory = new(() => ECDsa.Create(ECCurve.NamedCurves.nistP256));
-    public ECDsa MalloryKey => _mallory.Value;
+    private readonly Lazy<ECDsa> _attacker = new(() => ECDsa.Create(ECCurve.NamedCurves.nistP256));
+    public ECDsa AttackerKey => _attacker.Value;
 
     public ServerIdentity(IConfiguration cfg, ServerPaths paths, ILogger<ServerIdentity> log)
     {
@@ -168,7 +168,7 @@ public sealed class ServerIdentity : IDisposable
     public void Dispose()
     {
         Key.Dispose();
-        if (_mallory.IsValueCreated) _mallory.Value.Dispose();
+        if (_attacker.IsValueCreated) _attacker.Value.Dispose();
     }
 }
 

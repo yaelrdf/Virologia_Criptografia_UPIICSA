@@ -1,6 +1,6 @@
 digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
   rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
-  a [label="Eve conoce un par (P, C) de Yael Crypto March1 de 1 ronda\ncon parámetros reutilizados (sin AES-GCM)", shape=oval, fillcolor="#DCEAF7"];
+  a [label="El atacante conoce un par (P, C) de Yael Crypto March1 de 1 ronda\ncon parámetros reutilizados (sin AES-GCM)", shape=oval, fillcolor="#DCEAF7"];
   r [label="Para cada rotación rot = 0..n−1:\ny = rotarDer(C, rot)"];
   s [label="Para cada seed = 0..255:\nflujo s_i (LCG) ⇒ a_i = p_i + s_i mod 256"];
   k [label="Primer par: k·a₁ ≡ y₀ − a₀ (mod 256)\nsolución si gcd(a₁, 256) | (y₀ − a₀)\n(inverso modular por Euclides extendido)"];
