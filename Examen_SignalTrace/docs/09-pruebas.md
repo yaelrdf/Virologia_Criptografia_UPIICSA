@@ -19,6 +19,7 @@ Al renombrar el algoritmo a Yael Crypto March1 cambiaron sus etiquetas (`st1/ycm
 | Carga: simulador, 10 dispositivos a 1 Hz por HTTP | `SignalTrace.Simulator` | 201 paquetes | ✅ 200 aceptados, 0 rechazados (1 en vuelo al terminar) |
 | Carga: MQTT con ChaCha20, 2 dispositivos | `SignalTrace.Simulator --transport mqtt` | 40 paquetes | ✅ 40/40 |
 | Resistencia: 6 dispositivos, 10 min, anomalías y huecos | `SignalTrace.Simulator` | 3046 paquetes | ✅ 3046/3046, latencia media de 42.7 ms |
+| Segunda iteración: 6 dispositivos, 15 min, banco completo de sensores, con un reinicio deliberado del servidor y dos reinicios de sesiones del laboratorio | `SignalTrace.Simulator --anomalies --gaps` | 4591 paquetes | ✅ 4491 aceptados. Ningún rechazo criptográfico ni de validación. 24 `unknown_session` (reinicios) resueltos con un nuevo handshake automático. 76 fallos de red durante los ~40 s que el servidor estuvo apagado, reintentados con *backoff*. Latencia media de 110 ms, con las capturas y las pruebas corriendo a la vez en 2 núcleos |
 
 ## Vectores de interoperabilidad
 
