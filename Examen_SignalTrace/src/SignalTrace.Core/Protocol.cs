@@ -8,7 +8,7 @@ public static class Protocol
     public const int Version = 1;
     public const string InfoAesUp = "st1/aes-up";
     public const string InfoChaChaUp = "st1/c20-up";
-    public const string InfoSigMix = "st1/sigmix";
+    public const string InfoYcm1 = "st1/ycm1";
     public const string InfoIvUp = "st1/iv-up";
     public const string InfoAesDown = "st1/aes-down"; // reserved for server -> device commands
     public const string InfoIvDown = "st1/iv-down";   // reserved
@@ -44,7 +44,7 @@ public sealed record SessionKeys(byte[] KAead, byte[] KSig, byte[] IvSalt, strin
         var aeadInfo = suite == Suites.ChaCha20Poly1305 ? Protocol.InfoChaChaUp : Protocol.InfoAesUp;
         return new SessionKeys(
             Hkdf(ikm, salt, aeadInfo, 32),
-            Hkdf(ikm, salt, Protocol.InfoSigMix, 32),
+            Hkdf(ikm, salt, Protocol.InfoYcm1, 32),
             Hkdf(ikm, salt, Protocol.InfoIvUp, 4),
             suite);
     }

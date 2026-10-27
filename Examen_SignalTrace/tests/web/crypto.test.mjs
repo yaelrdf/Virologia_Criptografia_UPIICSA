@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import * as sigmix from "../../src/SignalTrace.Server/wwwroot/js/crypto/sigmix.js";
+import * as ycm1 from "../../src/SignalTrace.Server/wwwroot/js/crypto/ycm1.js";
 import * as S from "../../src/SignalTrace.Server/wwwroot/js/crypto/session.js";
 import { fromHex, toHex, toB64, utf8, randomBytes, entropy } from "../../src/SignalTrace.Server/wwwroot/js/crypto/util.js";
 
@@ -10,39 +10,39 @@ const V = JSON.parse(readFileSync(new URL("../../reference/test-vectors.json", i
 const hs = V.handshake, pk = V.packet;
 const out = (l) => hs.hkdf.outputs[l];
 
-test("SigMix worked example (1 round, no rotation, no padding)", () => {
-  const ex = V.sigmix_round_example;
+test("YCM1 worked example (1 round, no rotation, no padding)", () => {
+  const ex = V.ycm1_round_example;
   const stages = {};
-  const c = sigmix.encryptWithParams([72, 105], { seed: ex.seed, prm: [{ k: ex.k, m: ex.m, rot: 0 }] }, (n, s) => (stages[n] = [...s]), false);
+  const c = ycm1.encryptWithParams([72, 105], { seed: ex.seed, prm: [{ k: ex.k, m: ex.m, rot: 0 }] }, (n, s) => (stages[n] = [...s]), false);
   assert.deepEqual(stages["r1.stream"], ex.after_stream);
   assert.deepEqual([...c], ex.cipher);
-  assert.deepEqual([...sigmix.decryptWithParams(c, { seed: ex.seed, prm: [{ k: ex.k, m: ex.m, rot: 0 }] }, false)], ex.plain);
+  assert.deepEqual([...ycm1.decryptWithParams(c, { seed: ex.seed, prm: [{ k: ex.k, m: ex.m, rot: 0 }] }, false)], ex.plain);
 });
 
-test("SigMix packet params, every stage and output", async () => {
-  const kSig = fromHex(out("st1/sigmix(32)"));
-  const { seed, prm } = await sigmix.deriveParams(kSig, pk.seq);
-  assert.deepEqual({ seed, rounds: prm }, pk.sigmix_params);
+test("YCM1 packet params, every stage and output", async () => {
+  const kSig = fromHex(out("st1/ycm1(32)"));
+  const { seed, prm } = await ycm1.deriveParams(kSig, pk.seq);
+  assert.deepEqual({ seed, rounds: prm }, pk.ycm1_params);
   const stages = {};
-  const sm = await sigmix.encrypt(fromHex(pk.plaintext_hex), kSig, pk.seq, 3, (n, s) => (stages[n] = toHex(s)));
-  assert.deepEqual(stages, pk.sigmix_stages);
-  assert.equal(toHex(sm), pk.sigmix_output);
-  assert.equal(toHex(await sigmix.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
+  const sm = await ycm1.encrypt(fromHex(pk.plaintext_hex), kSig, pk.seq, 3, (n, s) => (stages[n] = toHex(s)));
+  assert.deepEqual(stages, pk.ycm1_stages);
+  assert.equal(toHex(sm), pk.ycm1_output);
+  assert.equal(toHex(await ycm1.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
 });
 
-test("SigMix round trip for lengths 0..199 and bad padding rejected", async () => {
+test("YCM1 round trip for lengths 0..199 and bad padding rejected", async () => {
   for (let len = 0; len < 200; len++) {
     const d = randomBytes(len), k = randomBytes(32);
-    assert.deepEqual(await sigmix.decrypt(await sigmix.encrypt(d, k, len * 7919), k, len * 7919), d);
+    assert.deepEqual(await ycm1.decrypt(await ycm1.encrypt(d, k, len * 7919), k, len * 7919), d);
   }
-  const prm = await sigmix.deriveParams(randomBytes(32), 1);
-  assert.throws(() => sigmix.decryptWithParams(sigmix.encryptWithParams([10, 3], prm, null, false), prm));
+  const prm = await ycm1.deriveParams(randomBytes(32), 1);
+  assert.throws(() => ycm1.decryptWithParams(ycm1.encryptWithParams([10, 3], prm, null, false), prm));
 });
 
 test("HKDF outputs and transcript", async () => {
   const keys = await S.deriveKeys(fromHex(hs.shared_secret_x), fromHex(hs.client_nonce), fromHex(hs.server_nonce));
   assert.equal(toHex(keys.kAead), out("st1/aes-up(32)"));
-  assert.equal(toHex(keys.kSig), out("st1/sigmix(32)"));
+  assert.equal(toHex(keys.kSig), out("st1/ycm1(32)"));
   assert.equal(toHex(keys.ivSalt), out("st1/iv-up(4)"));
   const t = S.transcript(fromHex(hs.client_ephemeral_public), fromHex(hs.server_ephemeral_public), fromHex(hs.client_nonce), fromHex(hs.server_nonce), hs.device_id, hs.session_id);
   assert.equal(toHex(t), hs.transcript);

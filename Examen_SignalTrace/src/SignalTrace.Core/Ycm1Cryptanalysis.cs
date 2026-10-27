@@ -1,17 +1,17 @@
 namespace SignalTrace.Core;
 
 /// <summary>
-/// Known-plaintext attack against a reduced SigMix (1 round, parameters reused for several messages).
-/// It shows why SigMix alone is academic: the round is affine over Z_256, so one (plaintext, ciphertext)
+/// Known-plaintext attack against a reduced YCM1 (1 round, parameters reused for several messages).
+/// It shows why YCM1 alone is academic: the round is affine over Z_256, so one (plaintext, ciphertext)
 /// pair lets us solve k and m with linear congruences for every guess of seed (256) and rotation (n).
 /// </summary>
-public static class SigMixCryptanalysis
+public static class Ycm1Cryptanalysis
 {
     /// <summary>
     /// <paramref name="Params"/> holds rot reduced mod n (all the known pair reveals). The real rotation byte is one of
     /// <paramref name="RotationCandidates"/> (rot + j·n ≤ 255); for a message of another length the attacker tries them.
     /// </summary>
-    public sealed record AttackResult(SigMixParams? Params, long Candidates, List<string> Log, int[] RotationCandidates);
+    public sealed record AttackResult(Ycm1Params? Params, long Candidates, List<string> Log, int[] RotationCandidates);
 
     /// <summary>Decrypts another ciphertext made with the same parameters, keeping the first plausible candidate.</summary>
     public static byte[]? DecryptOther(AttackResult r, byte[] cipher, Func<byte[], bool> plausible)
@@ -22,7 +22,7 @@ public static class SigMixCryptanalysis
         {
             try
             {
-                var plain = SigMix.DecryptWithParams(cipher, new SigMixParams(p.Seed, [round with { Rot = rot }]));
+                var plain = YaelCryptoMarch1.DecryptWithParams(cipher, new Ycm1Params(p.Seed, [round with { Rot = rot }]));
                 if (plausible(plain)) return plain;
             }
             catch (System.Security.Cryptography.CryptographicException) { }
@@ -33,7 +33,7 @@ public static class SigMixCryptanalysis
     public static AttackResult KnownPlaintextOneRound(byte[] plain, byte[] cipher)
     {
         var log = new List<string>();
-        var p = SigMix.Pad(plain);
+        var p = YaelCryptoMarch1.Pad(plain);
         var n = p.Length;
         if (cipher.Length != n) throw new ArgumentException("Plaintext and ciphertext lengths differ.");
         long tried = 0;
@@ -64,7 +64,7 @@ public static class SigMixCryptanalysis
                         var rots = Enumerable.Range(0, 256).Where(r => r % n == rot).ToArray();
                         log.Add($"Todos los {n / 2} pares cumplen K·(p+s) = c. Candidatos probados: {tried}.");
                         log.Add($"La rotación real es un byte r con r mod {n} = {rot}: {rots.Length} posibles valores ({string.Join(", ", rots)}).");
-                        return new AttackResult(new SigMixParams(seed, [new SigMixRound(k, m, rot)]), tried, log, rots);
+                        return new AttackResult(new Ycm1Params(seed, [new Ycm1Round(k, m, rot)]), tried, log, rots);
                     }
                 }
             }

@@ -29,9 +29,9 @@ public sealed class PacketTraceDto
 
     public string? PlaintextJson { get; set; }
     public double? PlaintextEntropy { get; set; }
-    public object? SigMixParams { get; set; }
-    public List<TraceStage> SigMixStages { get; set; } = [];
-    public double? SigMixEntropy { get; set; }
+    public object? Ycm1Params { get; set; }
+    public List<TraceStage> Ycm1Stages { get; set; } = [];
+    public double? Ycm1Entropy { get; set; }
     public string? Nonce { get; set; }
     public string? Aad { get; set; }
     public string? Ciphertext { get; set; }
@@ -53,12 +53,12 @@ public sealed class PacketTraceDto
             t.CaesarHex = Bytes.ToHex(caesar.AsSpan(0, Math.Min(caesar.Length, 512)));
             t.CaesarEntropy = Entropy.Shannon(caesar);
         }
-        if (d.SigMixParams is { } p)
-            t.SigMixParams = new { seed = p.Seed, rounds = p.Rounds.Select(r => new { k = r.K, m = r.M, rot = r.Rot }) };
-        t.SigMixStages = exposePlaintext
-            ? d.SigMix.Stages.Select(s => new TraceStage(s.Name, Bytes.ToHex(s.State), Entropy.Shannon(s.State))).ToList()
+        if (d.Ycm1Params is { } p)
+            t.Ycm1Params = new { seed = p.Seed, rounds = p.Rounds.Select(r => new { k = r.K, m = r.M, rot = r.Rot }) };
+        t.Ycm1Stages = exposePlaintext
+            ? d.Ycm1.Stages.Select(s => new TraceStage(s.Name, Bytes.ToHex(s.State), Entropy.Shannon(s.State))).ToList()
             : [];
-        if (d.SigMixOutput.Length > 0) t.SigMixEntropy = Entropy.Shannon(d.SigMixOutput);
+        if (d.Ycm1Output.Length > 0) t.Ycm1Entropy = Entropy.Shannon(d.Ycm1Output);
         if (d.Nonce.Length > 0) t.Nonce = Bytes.ToHex(d.Nonce);
         if (d.Aad.Length > 0) t.Aad = Bytes.ToHex(d.Aad);
         if (d.Ciphertext.Length > 0)

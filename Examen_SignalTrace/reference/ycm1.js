@@ -1,9 +1,9 @@
-// SigMix reference (ES module). Educational cipher: ALWAYS wrap with AES-GCM.
+// YCM1 reference (ES module). Educational cipher: ALWAYS wrap with AES-GCM.
 export async function deriveParams(kSig, seq, rounds = 3) {
-  const buf = new Uint8Array(kSig.length + 8 + 6);
+  const buf = new Uint8Array(kSig.length + 8 + 4);
   buf.set(kSig, 0);
   new DataView(buf.buffer).setBigUint64(kSig.length, BigInt(seq), false);
-  buf.set(new TextEncoder().encode("SigMix"), kSig.length + 8);
+  buf.set(new TextEncoder().encode("YCM1"), kSig.length + 8);
   const h = new Uint8Array(await crypto.subtle.digest("SHA-256", buf));
   const prm = [];
   for (let i = 0; i < rounds; i++) prm.push({ k: h[1 + 3 * i], m: h[2 + 3 * i], rot: h[3 + 3 * i] });

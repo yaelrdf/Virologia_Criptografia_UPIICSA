@@ -1,5 +1,5 @@
 // Telemetry agent for the phone browser (PLAN §12.1–12.2):
-// register device → confirm/pin the server fingerprint → ECDH handshake → sample → SigMix → AEAD → POST, in series.
+// register device → confirm/pin the server fingerprint → ECDH handshake → sample → Yael Crypto March1 → AEAD → POST, in series.
 import { api, store, toast, esc, fmtTime, fmtDateTime, ApiError } from "./api.js";
 import { requireAuth, renderShell } from "./ui/shell.js";
 import * as S from "./crypto/session.js";

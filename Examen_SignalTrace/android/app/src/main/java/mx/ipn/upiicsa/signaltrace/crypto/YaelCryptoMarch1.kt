@@ -4,17 +4,17 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 
 /**
- * SigMix — invented educational round cipher over Z_256 (PLAN §6.5), third implementation after C# and JS.
+ * YCM1 — invented educational round cipher over Z_256 (PLAN §6.5), third implementation after C# and JS.
  * Round: LCG keystream addition, 2×2 matrix mix with det = 1, circular left rotation.
  * Affine over Z_256 ⇒ NOT secure alone: it is always wrapped by AES-GCM / ChaCha20-Poly1305.
  */
-object SigMix {
+object YaelCryptoMarch1 {
     data class Round(val k: Int, val m: Int, val rot: Int)
     data class Params(val seed: Int, val rounds: List<Round>)
 
-    /** h = SHA-256(k_sig ‖ u64be(seq) ‖ "SigMix"); seed = h[0]; round i: k = h[1+3i], m = h[2+3i], rot = h[3+3i]. */
+    /** h = SHA-256(k_sig ‖ u64be(seq) ‖ "YCM1"); seed = h[0]; round i: k = h[1+3i], m = h[2+3i], rot = h[3+3i]. */
     fun deriveParams(kSig: ByteArray, seq: Long, rounds: Int = 3): Params {
-        val buf = ByteBuffer.allocate(kSig.size + 8 + 6).put(kSig).putLong(seq).put("SigMix".toByteArray(Charsets.US_ASCII)).array()
+        val buf = ByteBuffer.allocate(kSig.size + 8 + 4).put(kSig).putLong(seq).put("YCM1".toByteArray(Charsets.US_ASCII)).array()
         val h = MessageDigest.getInstance("SHA-256").digest(buf).map { it.toInt() and 0xFF }
         return Params(h[0], List(rounds) { i -> Round(h[1 + 3 * i], h[2 + 3 * i], h[3 + 3 * i]) })
     }

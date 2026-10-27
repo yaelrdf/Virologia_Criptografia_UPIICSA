@@ -32,7 +32,7 @@ public class VectorTests
     {
         var keys = SessionKeys.Derive(H(Hs, "shared_secret_x"), H(Hs, "client_nonce"), H(Hs, "server_nonce"));
         Assert.Equal(Out("st1/aes-up(32)"), Bytes.ToHex(keys.KAead));
-        Assert.Equal(Out("st1/sigmix(32)"), Bytes.ToHex(keys.KSig));
+        Assert.Equal(Out("st1/ycm1(32)"), Bytes.ToHex(keys.KSig));
         Assert.Equal(Out("st1/iv-up(4)"), Bytes.ToHex(keys.IvSalt));
     }
 
@@ -57,35 +57,35 @@ public class VectorTests
     }
 
     [Fact]
-    public void SigMix_RoundExample_ByHand()
+    public void Ycm1_RoundExample_ByHand()
     {
-        var ex = V.GetProperty("sigmix_round_example");
-        var prm = new SigMixParams(ex.GetProperty("seed").GetInt32(), [new SigMixRound(ex.GetProperty("k").GetInt32(), ex.GetProperty("m").GetInt32(), 0)]);
-        var trace = new SigMixTraceRecorder();
-        var c = SigMix.EncryptWithParams([72, 105], prm, trace, pad: false);
+        var ex = V.GetProperty("ycm1_round_example");
+        var prm = new Ycm1Params(ex.GetProperty("seed").GetInt32(), [new Ycm1Round(ex.GetProperty("k").GetInt32(), ex.GetProperty("m").GetInt32(), 0)]);
+        var trace = new Ycm1TraceRecorder();
+        var c = YaelCryptoMarch1.EncryptWithParams([72, 105], prm, trace, pad: false);
         Assert.Equal([110, 42], trace.Stages.Single(s => s.Name == "r1.stream").State);
         Assert.Equal([236, 198], c);
-        Assert.Equal([72, 105], SigMix.DecryptWithParams(c, prm, pad: false));
+        Assert.Equal([72, 105], YaelCryptoMarch1.DecryptWithParams(c, prm, pad: false));
     }
 
     [Fact]
-    public void SigMix_Packet_Params_Stages_Output()
+    public void Ycm1_Packet_Params_Stages_Output()
     {
-        var kSig = Bytes.FromHex(Out("st1/sigmix(32)"));
+        var kSig = Bytes.FromHex(Out("st1/ycm1(32)"));
         var seq = Pk.GetProperty("seq").GetUInt64();
-        var prm = SigMix.DeriveParams(kSig, seq);
-        var want = Pk.GetProperty("sigmix_params");
+        var prm = YaelCryptoMarch1.DeriveParams(kSig, seq);
+        var want = Pk.GetProperty("ycm1_params");
         Assert.Equal(want.GetProperty("seed").GetInt32(), prm.Seed);
         var rounds = want.GetProperty("rounds").EnumerateArray().ToArray();
         for (var i = 0; i < 3; i++)
-            Assert.Equal(new SigMixRound(rounds[i].GetProperty("k").GetInt32(), rounds[i].GetProperty("m").GetInt32(), rounds[i].GetProperty("rot").GetInt32()), prm.Rounds[i]);
+            Assert.Equal(new Ycm1Round(rounds[i].GetProperty("k").GetInt32(), rounds[i].GetProperty("m").GetInt32(), rounds[i].GetProperty("rot").GetInt32()), prm.Rounds[i]);
 
-        var trace = new SigMixTraceRecorder();
-        var sm = SigMix.Encrypt(H(Pk, "plaintext_hex"), kSig, seq, 3, trace);
-        foreach (var stage in Pk.GetProperty("sigmix_stages").EnumerateObject())
+        var trace = new Ycm1TraceRecorder();
+        var sm = YaelCryptoMarch1.Encrypt(H(Pk, "plaintext_hex"), kSig, seq, 3, trace);
+        foreach (var stage in Pk.GetProperty("ycm1_stages").EnumerateObject())
             Assert.Equal(stage.Value.GetString(), Bytes.ToHex(trace.Stages.Single(s => s.Name == stage.Name).State));
-        Assert.Equal(Pk.GetProperty("sigmix_output").GetString(), Bytes.ToHex(sm));
-        Assert.Equal(Pk.GetProperty("plaintext_hex").GetString(), Bytes.ToHex(SigMix.Decrypt(sm, kSig, seq)));
+        Assert.Equal(Pk.GetProperty("ycm1_output").GetString(), Bytes.ToHex(sm));
+        Assert.Equal(Pk.GetProperty("plaintext_hex").GetString(), Bytes.ToHex(YaelCryptoMarch1.Decrypt(sm, kSig, seq)));
     }
 
     [Fact]

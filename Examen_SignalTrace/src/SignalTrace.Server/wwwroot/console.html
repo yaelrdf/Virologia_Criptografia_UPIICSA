@@ -39,7 +39,7 @@
         <button id="play" class="primary">▶ Paso a paso</button>
       </div>
     </div>
-    <p class="muted small">Cada paquete que llega al servidor (HTTP o MQTT) se muestra etapa por etapa: los bytes del cable → verificación de la etiqueta AEAD → nonce y AAD → inversa de SigMix ronda por ronda → texto claro. Las llaves de sesión solo aparecen con <code>Lab:ExposeKeys=true</code>.</p>
+    <p class="muted small">Cada paquete que llega al servidor (HTTP o MQTT) se muestra etapa por etapa: los bytes del cable → verificación de la etiqueta AEAD → nonce y AAD → inversa de Yael Crypto March1 ronda por ronda → texto claro. Las llaves de sesión solo aparecen con <code>Lab:ExposeKeys=true</code>.</p>
     <div class="codes" id="codes" style="margin-bottom:12px"></div>
 
     <div class="grid sidebar">
@@ -71,10 +71,10 @@
             <div class="hexview" id="a-ct"></div>
             <div class="ebar"><i id="a-bar"></i></div>
           </section>
-          <section class="card stage" data-stage="sigmix">
-            <h3>4 · SigMix (algoritmo propio) <small id="s-params"></small></h3>
+          <section class="card stage" data-stage="ycm1">
+            <h3>4 · Yael Crypto March1 (algoritmo propio) <small id="s-params"></small></h3>
             <div id="s-rounds-tbl" class="table-wrap"></div>
-            <div class="rounds" id="s-rounds" role="tablist" aria-label="Etapas de SigMix"></div>
+            <div class="rounds" id="s-rounds" role="tablist" aria-label="Etapas de Yael Crypto March1"></div>
             <div class="small muted" id="s-explain"></div>
             <div class="hexview" id="s-hex" style="margin-top:6px"></div>
             <div class="ebar"><i id="s-bar"></i></div>

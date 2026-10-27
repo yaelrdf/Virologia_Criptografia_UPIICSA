@@ -98,7 +98,7 @@ await page.click("#run-all");
 await page.waitForFunction(() => document.querySelector("#summary table") && !document.getElementById("run-all").disabled, { timeout: 120000 });
 await sleep(800);
 await shotOf("web_lab", [".page-head", "#summary", "#cfg"]);
-await shotOf("web_lab_escenarios", ["#sc-bitflip", "#sc-replay", "#sc-mitm", "#sc-sigmix"]);
+await shotOf("web_lab_escenarios", ["#sc-bitflip", "#sc-replay", "#sc-mitm", "#sc-ycm1"]);
 
 // Console
 await go("console.html", 3000);
@@ -108,9 +108,9 @@ await page.evaluate(() => {
 });
 await sleep(800);
 await shot("web_consola");
-await page.evaluate(() => { document.querySelector('#s-rounds button[data-i="2"]')?.click(); document.querySelector(".stage[data-stage=sigmix]").scrollIntoView(); });
+await page.evaluate(() => { document.querySelector('#s-rounds button[data-i="2"]')?.click(); document.querySelector(".stage[data-stage=ycm1]").scrollIntoView(); });
 await sleep(600);
-await shotOf("web_consola_sigmix", ['.stage[data-stage="sigmix"]']);
+await shotOf("web_consola_sigmix", ['.stage[data-stage="ycm1"]']);
 await shotOf("web_consola_aead", ['.stage[data-stage="wire"]', '.stage[data-stage="verify"]', '.stage[data-stage="aead"]']);
 await shotOf("web_consola_entropia", ["section.card:has(> .chart-box > #c-ent)", "section.card:has(> #c-hex)"]);
 await page.evaluate(() => {

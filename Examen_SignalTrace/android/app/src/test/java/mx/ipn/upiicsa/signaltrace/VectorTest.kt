@@ -10,7 +10,7 @@ import kotlinx.serialization.json.long
 import mx.ipn.upiicsa.signaltrace.crypto.Protocol
 import mx.ipn.upiicsa.signaltrace.crypto.Protocol.hex
 import mx.ipn.upiicsa.signaltrace.crypto.Protocol.unhex
-import mx.ipn.upiicsa.signaltrace.crypto.SigMix
+import mx.ipn.upiicsa.signaltrace.crypto.YaelCryptoMarch1
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,7 +39,7 @@ class VectorTest {
     @Test fun hkdfOutputs() {
         val k = Protocol.deriveKeys(unhex(hs.s("shared_secret_x")), unhex(hs.s("client_nonce")), unhex(hs.s("server_nonce")))
         assertEquals(out("st1/aes-up(32)"), hex(k.kAead))
-        assertEquals(out("st1/sigmix(32)"), hex(k.kSig))
+        assertEquals(out("st1/ycm1(32)"), hex(k.kSig))
         assertEquals(out("st1/iv-up(4)"), hex(k.ivSalt))
     }
 
@@ -53,31 +53,31 @@ class VectorTest {
         assertFalse(Protocol.verifySignature(unhex(hs.s("server_longterm_public")), t, sig))
     }
 
-    @Test fun sigmixWorkedExample() {
-        val ex = v["sigmix_round_example"]!!.jsonObject
+    @Test fun ycm1WorkedExample() {
+        val ex = v["ycm1_round_example"]!!.jsonObject
         val stages = mutableMapOf<String, List<Int>>()
-        val c = SigMix.encryptWithParams(byteArrayOf(72, 105), SigMix.Params(ex["seed"]!!.jsonPrimitive.int,
-            listOf(SigMix.Round(ex["k"]!!.jsonPrimitive.int, ex["m"]!!.jsonPrimitive.int, 0))),
+        val c = YaelCryptoMarch1.encryptWithParams(byteArrayOf(72, 105), YaelCryptoMarch1.Params(ex["seed"]!!.jsonPrimitive.int,
+            listOf(YaelCryptoMarch1.Round(ex["k"]!!.jsonPrimitive.int, ex["m"]!!.jsonPrimitive.int, 0))),
             { n, b -> stages[n] = b.map { it.toInt() and 0xFF } }, usePad = false)
         assertEquals(listOf(110, 42), stages["r1.stream"])
         assertEquals(listOf(236, 198), c.map { it.toInt() and 0xFF })
     }
 
-    @Test fun sigmixPacketStages() {
-        val kSig = unhex(out("st1/sigmix(32)"))
+    @Test fun ycm1PacketStages() {
+        val kSig = unhex(out("st1/ycm1(32)"))
         val seq = pk["seq"]!!.jsonPrimitive.long
-        val prm = SigMix.deriveParams(kSig, seq)
-        val want = pk["sigmix_params"]!!.jsonObject
+        val prm = YaelCryptoMarch1.deriveParams(kSig, seq)
+        val want = pk["ycm1_params"]!!.jsonObject
         assertEquals(want["seed"]!!.jsonPrimitive.int, prm.seed)
         want["rounds"]!!.jsonArray.forEachIndexed { i, r ->
             val o = r.jsonObject
-            assertEquals(SigMix.Round(o["k"]!!.jsonPrimitive.int, o["m"]!!.jsonPrimitive.int, o["rot"]!!.jsonPrimitive.int), prm.rounds[i])
+            assertEquals(YaelCryptoMarch1.Round(o["k"]!!.jsonPrimitive.int, o["m"]!!.jsonPrimitive.int, o["rot"]!!.jsonPrimitive.int), prm.rounds[i])
         }
         val stages = mutableMapOf<String, String>()
-        val sm = SigMix.encrypt(unhex(pk.s("plaintext_hex")), kSig, seq) { n, b -> stages[n] = hex(b) }
-        pk["sigmix_stages"]!!.jsonObject.forEach { (name, value) -> assertEquals(name, value.jsonPrimitive.content, stages[name]) }
-        assertEquals(pk.s("sigmix_output"), hex(sm))
-        assertEquals(pk.s("plaintext_hex"), hex(SigMix.decrypt(sm, kSig, seq)))
+        val sm = YaelCryptoMarch1.encrypt(unhex(pk.s("plaintext_hex")), kSig, seq) { n, b -> stages[n] = hex(b) }
+        pk["ycm1_stages"]!!.jsonObject.forEach { (name, value) -> assertEquals(name, value.jsonPrimitive.content, stages[name]) }
+        assertEquals(pk.s("ycm1_output"), hex(sm))
+        assertEquals(pk.s("plaintext_hex"), hex(YaelCryptoMarch1.decrypt(sm, kSig, seq)))
     }
 
     @Test fun packetSealMatchesAesGcmVector() {
@@ -95,12 +95,12 @@ class VectorTest {
         try { Protocol.open(keys, hs.s("device_id"), seq, ts, ct); throw AssertionError("tampered packet accepted") } catch (_: AEADBadTagException) { }
     }
 
-    @Test fun sigmixRoundTripAllLengths() {
+    @Test fun ycm1RoundTripAllLengths() {
         val rnd = SecureRandom()
         for (len in 0 until 200) {
             val d = ByteArray(len).also(rnd::nextBytes)
             val k = ByteArray(32).also(rnd::nextBytes)
-            assertArrayEquals(d, SigMix.decrypt(SigMix.encrypt(d, k, len * 7919L), k, len * 7919L))
+            assertArrayEquals(d, YaelCryptoMarch1.decrypt(YaelCryptoMarch1.encrypt(d, k, len * 7919L), k, len * 7919L))
         }
     }
 

@@ -4,7 +4,7 @@ import { api, store, esc, toast } from "./api.js";
 import { requireAuth, renderShell } from "./ui/shell.js";
 import * as S from "./crypto/session.js";
 import { fromB64, toB64, utf8, entropy } from "./crypto/util.js";
-import { encryptWithParams } from "./crypto/sigmix.js";
+import { encryptWithParams } from "./crypto/ycm1.js";
 
 const auth = requireAuth({ admin: true });
 renderShell("lab.html");
@@ -48,7 +48,7 @@ async function seal(p, seq = ++session.seq) {
 
 // ---------- scenarios: { id, title, what, expect, run(log) → actual }
 const SCENARIOS = [
-  { id: "normal", title: "Normal", what: "Handshake ECDH firmado, luego una lectura SigMix → AES-GCM.", expect: "202",
+  { id: "normal", title: "Normal", what: "Handshake ECDH firmado, luego una lectura Yael Crypto March1 → AES-GCM.", expect: "202",
     async run(log) {
       const { resp } = await handshake();
       log(`Handshake: sesión ${resp.sessionId}, firma ECDSA verificada con la huella fijada ${server.fingerprint.slice(0, 16)}…`);
@@ -155,9 +155,9 @@ const SCENARIOS = [
       await handshake();
       return String(r.status);
     } },
-  { id: "sigmix", title: "Ataque a SigMix sin AES (texto claro conocido)", what: "SigMix de 1 ronda con parámetros reutilizados, sin capa AEAD.", expect: "texto recuperado",
+  { id: "ycm1", title: "Ataque a Yael Crypto March1 sin AES (texto claro conocido)", what: "Yael Crypto March1 de 1 ronda con parámetros reutilizados, sin capa AEAD.", expect: "texto recuperado",
     async run(log) {
-      const r = await api("/api/lab/sigmix-attack", { method: "POST", body: {} });
+      const r = await api("/api/lab/ycm1-attack", { method: "POST", body: {} });
       log(`Parámetros secretos: seed=${r.secret.seed}, k=${r.secret.k}, m=${r.secret.m}, rot=${r.secret.rot}`);
       r.log.forEach((l) => log(l));
       log(`Parámetros hallados: seed=${r.found?.seed}, k=${r.found?.k}, m=${r.found?.m}, rot≡${r.found?.rot} · ${r.candidates} candidatos en ${r.elapsedMs} ms`);
@@ -176,7 +176,7 @@ const SCENARIOS = [
       }
       return "no roto";
     } },
-  { id: "sigmixdemo", title: "SigMix: ejemplo de mano", what: "\"Hi\" = (72, 105), seed 7, k 3, m 5, 1 ronda sin rotación.", expect: "(236, 198)",
+  { id: "ycm1demo", title: "Yael Crypto March1: ejemplo de mano", what: "\"Hi\" = (72, 105), seed 7, k 3, m 5, 1 ronda sin rotación.", expect: "(236, 198)",
     async run(log) {
       const stages = [];
       const c = encryptWithParams([72, 105], { seed: 7, prm: [{ k: 3, m: 5, rot: 0 }] }, (n, s) => stages.push(`${n}: (${[...s].join(", ")})`), false);
