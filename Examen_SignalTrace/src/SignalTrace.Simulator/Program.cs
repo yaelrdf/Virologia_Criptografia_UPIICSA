@@ -4,7 +4,7 @@ using System.Text.Json;
 using SignalTrace.Core;
 using SignalTrace.Simulator;
 
-// SignalTrace simulator: N virtual devices with the real protocol (handshake + SigMix + AEAD), over HTTP or MQTT.
+// SignalTrace simulator: N virtual devices with the real protocol (handshake + YCM1 + AEAD), over HTTP or MQTT.
 // Usage: dotnet run --project src/SignalTrace.Simulator -- --server http://localhost:5090 --user admin --password X
 //        [--fingerprint HEX] [--devices 10] [--rate 1] [--anomalies] [--transport http|mqtt] [--duration 60] [--suite chacha20-poly1305]
 

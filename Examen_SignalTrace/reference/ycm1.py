@@ -1,8 +1,8 @@
-"""SigMix reference implementation (educational cipher, NOT secure on its own)."""
+"""YCM1 reference implementation (educational cipher, NOT secure on its own)."""
 import hashlib, struct
 
 def derive_params(k_sig: bytes, seq: int, rounds: int = 3):
-    h = hashlib.sha256(k_sig + struct.pack(">Q", seq) + b"SigMix").digest()
+    h = hashlib.sha256(k_sig + struct.pack(">Q", seq) + b"YCM1").digest()
     seed = h[0]
     ks = [(h[1 + 3 * i], h[2 + 3 * i], h[3 + 3 * i]) for i in range(rounds)]  # (k, m, rot)
     return seed, ks

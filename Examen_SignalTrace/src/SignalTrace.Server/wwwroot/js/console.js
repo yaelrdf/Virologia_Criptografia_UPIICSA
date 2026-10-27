@@ -1,4 +1,4 @@
-// Admin console (PLAN §11.2): every packet stage by stage, SigMix round by round, entropies and a step-by-step animation.
+// Admin console (PLAN §11.2): every packet stage by stage, Yael Crypto March1 round by round, entropies and a step-by-step animation.
 import { api, getAuth, esc, fmtTime } from "./api.js";
 import { requireAuth, renderShell } from "./ui/shell.js";
 import { fromHex } from "./crypto/util.js";
@@ -83,7 +83,7 @@ function show(t) {
     t.message && ["Motivo", esc(t.message)], t.warning && ["Aviso", esc(t.warning)],
     ["Dispositivo", `<span class="mono">${esc(t.did ?? "—")}</span>`], ["Sesión", `<span class="mono">${esc(t.sid ?? "—")}</span>`],
     ["seq", `${t.seq}${t.lastSeq != null ? ` (último aceptado: ${t.lastSeq})` : ""}`], ["ts", `${t.ts} (${fmtTime(t.ts)})`], ["Suite", esc(t.suite ?? "—")],
-    ["Orden", "token ↔ did → sesión → seq fresco → etiqueta AEAD → SigMix⁻¹ → validación → se consume seq"],
+    ["Orden", "token ↔ did → sesión → seq fresco → etiqueta AEAD → Yael Crypto March1⁻¹ → validación → se consume seq"],
   ].filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   $("v-times").textContent = Object.entries(t.micros ?? {}).map(([k, v]) => `${k}: ${v} µs`).join(" · ");
   // 3. AEAD
@@ -97,8 +97,8 @@ function show(t) {
   $("a-len").textContent = t.ciphertext ? `${t.ciphertext.length / 2} B` : "";
   $("a-ent").textContent = t.ciphertextEntropy != null ? `entropía ${t.ciphertextEntropy.toFixed(2)} bits/byte` : "";
   $("a-bar").style.width = t.ciphertextEntropy != null ? entPct(t.ciphertextEntropy) : "0";
-  // 4. SigMix
-  renderSigMix(t);
+  // 4. Yael Crypto March1
+  renderYcm1(t);
   // 5. plaintext
   $("p-json").textContent = t.plaintextJson ? JSON.stringify(JSON.parse(t.plaintextJson), null, 2) : "— (no expuesto o no descifrado)";
   $("p-ent").textContent = t.plaintextEntropy != null ? `entropía ${t.plaintextEntropy.toFixed(2)} bits/byte` : "";
@@ -106,7 +106,7 @@ function show(t) {
   $("c-hex").innerHTML = t.caesarHex ? hexView(t.caesarHex, null, 160) : "—";
   $("c-ent-caesar").textContent = t.caesarEntropy != null ? `${t.caesarEntropy.toFixed(2)} bits/byte` : "";
   // entropy chart
-  const rows = [["texto claro", t.plaintextEntropy], ...(t.sigMixStages ?? []).filter((s) => /padded|rotate/.test(s.name)).map((s) => [s.name, s.entropy]),
+  const rows = [["texto claro", t.plaintextEntropy], ...(t.ycm1Stages ?? []).filter((s) => /padded|rotate/.test(s.name)).map((s) => [s.name, s.entropy]),
     ["ct (AEAD)", t.ciphertextEntropy], ["César", t.caesarEntropy]].filter((r) => r[1] != null);
   entChart.data.labels = rows.map((r) => r[0]);
   entChart.data.datasets[0].data = rows.map((r) => r[1]);
@@ -117,10 +117,10 @@ function show(t) {
   if (t.keys) $("keys").innerHTML = Object.entries(t.keys).map(([k, v]) => `<dt>${k}</dt><dd class="mono">${v}</dd>`).join("");
 }
 
-function renderSigMix(t) {
-  const stages = t.sigMixStages ?? [];
-  const p = t.sigMixParams;
-  $("s-params").textContent = p ? `seed = ${p.seed} · 3 rondas · parámetros = SHA-256(k_sig ‖ seq ‖ "SigMix")` : "";
+function renderYcm1(t) {
+  const stages = t.ycm1Stages ?? [];
+  const p = t.ycm1Params;
+  $("s-params").textContent = p ? `seed = ${p.seed} · 3 rondas · parámetros = SHA-256(k_sig ‖ seq ‖ "YCM1")` : "";
   $("s-rounds-tbl").innerHTML = p ? `<table><thead><tr><th>Ronda</th><th>k</th><th>m</th><th>rot</th><th>K (mod 256)</th><th>det</th></tr></thead><tbody>${
     p.rounds.map((r, i) => `<tr><td>${i + 1}</td><td>${r.k}</td><td>${r.m}</td><td>${r.rot}</td>
       <td><span class="matrix"><span>1</span><span>${r.k}</span><span>${r.m}</span><span>${(1 + r.k * r.m) & 255}</span></span></td><td>1</td></tr>`).join("")}</tbody></table>` : "";
@@ -129,7 +129,7 @@ function renderSigMix(t) {
   selectStage(Math.min(st.stageIdx, Math.max(0, stages.length - 1)));
 }
 function selectStage(i) {
-  const stages = st.selected?.sigMixStages ?? [];
+  const stages = st.selected?.ycm1Stages ?? [];
   st.stageIdx = i;
   document.querySelectorAll("#s-rounds button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === i)));
   const s = stages[i];
@@ -141,7 +141,7 @@ function selectStage(i) {
 }
 $("s-rounds").addEventListener("click", (e) => { const b = e.target.closest("button[data-i]"); if (b) selectStage(Number(b.dataset.i)); });
 
-// ---------- step-by-step animation (device side order: plaintext → SigMix rounds → AEAD → wire)
+// ---------- step-by-step animation (device side order: plaintext → Yael Crypto March1 rounds → AEAD → wire)
 let animating = false;
 async function play() {
   const t = st.selected;
@@ -155,7 +155,7 @@ async function play() {
     await new Promise((r) => setTimeout(r, ms));
   };
   await focus("plain");
-  for (let i = 0; i < (t.sigMixStages?.length ?? 0); i++) { selectStage(i); await focus("sigmix", 900); }
+  for (let i = 0; i < (t.ycm1Stages?.length ?? 0); i++) { selectStage(i); await focus("ycm1", 900); }
   await focus("aead");
   await focus("wire");
   await focus("verify", 1500);

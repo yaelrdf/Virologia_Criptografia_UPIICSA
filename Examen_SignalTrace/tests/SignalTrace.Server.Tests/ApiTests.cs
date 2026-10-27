@@ -191,10 +191,10 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     }
 
     [Fact]
-    public async Task Lab_SigMixAttack_RecoversSecondMessage()
+    public async Task Lab_Ycm1Attack_RecoversSecondMessage()
     {
         var http = Client();
-        var req = new HttpRequestMessage(HttpMethod.Post, "/api/lab/sigmix-attack") { Content = JsonContent.Create(new { }) };
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/lab/ycm1-attack") { Content = JsonContent.Create(new { }) };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
         var r = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("{\"gps\":{\"lat\":19.5046,\"lon\":-99.1468}}", r.GetProperty("recoveredPlaintext").GetString());
@@ -235,7 +235,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var r = await reading.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(0.5, r.GetProperty("batLvl").GetDouble());
         var t = await trace.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Equal(9, t.GetProperty("sigMixStages").GetArrayLength() - 1); // padded + 3 rounds × 3 stages
+        Assert.Equal(9, t.GetProperty("ycm1Stages").GetArrayLength() - 1); // padded + 3 rounds × 3 stages
         await conn.DisposeAsync();
 
         var anonymous = new HubConnectionBuilder()

@@ -1,6 +1,6 @@
 # SignalTrace para Android (Kotlin + Jetpack Compose)
 
-La app usa el mismo protocolo que el cliente web: SigMix + AES-256-GCM o ChaCha20-Poly1305, llaves ECDH/HKDF y un handshake firmado con ECDSA y huella fijada. Agrega la señal Wi-Fi y la celular, y sigue enviando con la pantalla bloqueada gracias a un servicio en primer plano.
+La app usa el mismo protocolo que el cliente web: Yael Crypto March1 + AES-256-GCM o ChaCha20-Poly1305, llaves ECDH/HKDF y un handshake firmado con ECDSA y huella fijada. Agrega la señal Wi-Fi y la celular, y sigue enviando con la pantalla bloqueada gracias a un servicio en primer plano.
 
 ## Compilar
 
@@ -24,7 +24,7 @@ export JAVA_HOME=/ruta/al/jbr
 
 ## Estructura
 
-- `crypto/SigMix.kt` y `crypto/Protocol.kt`: SigMix, HKDF, ECDH, ECDSA (conversión de P1363 a DER), AES-GCM y ChaCha20-Poly1305.
+- `crypto/YaelCryptoMarch1.kt` y `crypto/Protocol.kt`: Yael Crypto March1, HKDF, ECDH, ECDSA (conversión de P1363 a DER), AES-GCM y ChaCha20-Poly1305.
 - `data/Api.kt`: cliente REST (JVM puro). `data/Settings.kt`: preferencias y secretos cifrados con el Android Keystore.
 - `telemetry/Collectors.kt`: GPS, acelerómetro, batería, red, Wi-Fi y celular.
 - `telemetry/TelemetryEngine.kt`: muestreo, cola persistente, envío en serie, re-handshake y backoff.

@@ -61,7 +61,7 @@ object Protocol {
         val salt = nonceC + nonceS
         return SessionKeys(
             hkdf(z, salt, if (suite == SUITE_CHACHA) "st1/c20-up" else "st1/aes-up", 32),
-            hkdf(z, salt, "st1/sigmix", 32),
+            hkdf(z, salt, "st1/ycm1", 32),
             hkdf(z, salt, "st1/iv-up", 4),
             suite,
         )
@@ -142,13 +142,13 @@ object Protocol {
             }
         }
 
-    /** sm = SigMix(pt, k_sig, seq); ct‖tag = AEAD(k, iv_salt ‖ u64be(seq), sm, "ST1" ‖ did ‖ seq ‖ ts). */
+    /** sm = YCM1(pt, k_sig, seq); ct‖tag = AEAD(k, iv_salt ‖ u64be(seq), sm, "ST1" ‖ did ‖ seq ‖ ts). */
     fun seal(keys: SessionKeys, deviceId: String, seq: Long, ts: Long, plaintext: ByteArray): ByteArray =
-        aead(keys, Cipher.ENCRYPT_MODE, nonce(keys.ivSalt, seq), aad(deviceId, seq, ts), SigMix.encrypt(plaintext, keys.kSig, seq))
+        aead(keys, Cipher.ENCRYPT_MODE, nonce(keys.ivSalt, seq), aad(deviceId, seq, ts), YaelCryptoMarch1.encrypt(plaintext, keys.kSig, seq))
 
     /** Throws [AEADBadTagException] when the packet was altered. */
     fun open(keys: SessionKeys, deviceId: String, seq: Long, ts: Long, ctAndTag: ByteArray): ByteArray =
-        SigMix.decrypt(aead(keys, Cipher.DECRYPT_MODE, nonce(keys.ivSalt, seq), aad(deviceId, seq, ts), ctAndTag), keys.kSig, seq)
+        YaelCryptoMarch1.decrypt(aead(keys, Cipher.DECRYPT_MODE, nonce(keys.ivSalt, seq), aad(deviceId, seq, ts), ctAndTag), keys.kSig, seq)
 
     /** HMAC-SHA256 anonymisation of identifiers (SSID, BSSID, cell id) with a key that never leaves the phone. */
     fun anonymize(localKey: ByteArray, value: String) = "h:" + hex(hmac(localKey, value.toByteArray())).take(16)

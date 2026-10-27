@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   The server may run on the local network without a certificate (http://192.168.x.x:5090) for class demos.
-  Telemetry is end-to-end encrypted at the application layer (SigMix + AEAD with ECDH keys), but the device
+  Telemetry is end-to-end encrypted at the application layer (YCM1 + AEAD with ECDH keys), but the device
   JWT travels in clear over HTTP: the app warns about http:// URLs and the guide recommends an HTTPS tunnel.
 -->
 <network-security-config>

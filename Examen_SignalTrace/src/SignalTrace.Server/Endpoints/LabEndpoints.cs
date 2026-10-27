@@ -30,7 +30,7 @@ public sealed class EnrollmentCodes(TimeProvider clock)
 }
 
 public sealed record EnrollRedeemRequest(string Code, string Name, string Kind);
-public sealed record SigMixAttackRequest(string? Plaintext, string? SecondPlaintext);
+public sealed record Ycm1AttackRequest(string? Plaintext, string? SecondPlaintext);
 
 public static class LabEndpoints
 {
@@ -93,20 +93,20 @@ public static class LabEndpoints
             return Results.Ok(new { cleared = n });
         });
 
-        // Known-plaintext attack on 1-round SigMix with reused parameters, then decryption of a second message.
-        lab.MapPost("/sigmix-attack", (SigMixAttackRequest req) =>
+        // Known-plaintext attack on 1-round YCM1 with reused parameters, then decryption of a second message.
+        lab.MapPost("/ycm1-attack", (Ycm1AttackRequest req) =>
         {
             var p1 = Encoding.UTF8.GetBytes(req.Plaintext ?? "{\"t\":1760000000000,\"src\":\"sim\",\"bat\":{\"lvl\":0.5}}");
             var p2 = Encoding.UTF8.GetBytes(req.SecondPlaintext ?? "{\"gps\":{\"lat\":19.5046,\"lon\":-99.1468}}");
-            var secret = SigMix.DeriveParams(RandomNumberGenerator.GetBytes(32), 1, rounds: 1);
-            var c1 = SigMix.EncryptWithParams(p1, secret);
-            var c2 = SigMix.EncryptWithParams(p2, secret);
+            var secret = YaelCryptoMarch1.DeriveParams(RandomNumberGenerator.GetBytes(32), 1, rounds: 1);
+            var c1 = YaelCryptoMarch1.EncryptWithParams(p1, secret);
+            var c2 = YaelCryptoMarch1.EncryptWithParams(p2, secret);
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var attack = SigMixCryptanalysis.KnownPlaintextOneRound(p1, c1);
+            var attack = Ycm1Cryptanalysis.KnownPlaintextOneRound(p1, c1);
             var ms = sw.Elapsed.TotalMilliseconds;
             string? recovered = null;
             // The attacker keeps the rotation candidate whose output is valid UTF-8 JSON.
-            if (SigMixCryptanalysis.DecryptOther(attack, c2, LooksLikeJson) is { } plain) recovered = Encoding.UTF8.GetString(plain);
+            if (Ycm1Cryptanalysis.DecryptOther(attack, c2, LooksLikeJson) is { } plain) recovered = Encoding.UTF8.GetString(plain);
             var r0 = secret.Rounds[0];
             return Results.Ok(new
             {
@@ -120,7 +120,7 @@ public static class LabEndpoints
                 rotationCandidates = attack.RotationCandidates,
                 elapsedMs = Math.Round(ms, 2),
                 log = attack.Log,
-                note = "Con AES-256-GCM encima, Eve nunca ve la salida de SigMix: la captura solo contiene ct||tag con entropía ≈ 8 bits/byte.",
+                note = "Con AES-256-GCM encima, Eve nunca ve la salida de Yael Crypto March1: la captura solo contiene ct||tag con entropía ≈ 8 bits/byte.",
             });
         });
     }

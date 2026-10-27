@@ -6,38 +6,38 @@ namespace SignalTrace.Core.Tests;
 public class PropertyTests
 {
     [Fact]
-    public void SigMix_RoundTrip_Lengths_0_To_199()
+    public void Ycm1_RoundTrip_Lengths_0_To_199()
     {
         for (var len = 0; len < 200; len++)
         {
             var data = RandomNumberGenerator.GetBytes(len);
             var key = RandomNumberGenerator.GetBytes(32);
             var seq = (ulong)len * 7919;
-            Assert.Equal(data, SigMix.Decrypt(SigMix.Encrypt(data, key, seq), key, seq));
+            Assert.Equal(data, YaelCryptoMarch1.Decrypt(YaelCryptoMarch1.Encrypt(data, key, seq), key, seq));
         }
     }
 
     [Fact]
-    public void SigMix_Params_Deterministic_And_SeqSensitive()
+    public void Ycm1_Params_Deterministic_And_SeqSensitive()
     {
         var key = RandomNumberGenerator.GetBytes(32);
-        Assert.Equal(SigMix.DeriveParams(key, 5).Rounds, SigMix.DeriveParams(key, 5).Rounds);
-        Assert.NotEqual(SigMix.DeriveParams(key, 5).Rounds, SigMix.DeriveParams(key, 6).Rounds);
+        Assert.Equal(YaelCryptoMarch1.DeriveParams(key, 5).Rounds, YaelCryptoMarch1.DeriveParams(key, 5).Rounds);
+        Assert.NotEqual(YaelCryptoMarch1.DeriveParams(key, 5).Rounds, YaelCryptoMarch1.DeriveParams(key, 6).Rounds);
     }
 
     [Fact]
-    public void SigMix_BadPadding_Throws()
+    public void Ycm1_BadPadding_Throws()
     {
         var key = RandomNumberGenerator.GetBytes(32);
-        var prm = SigMix.DeriveParams(key, 1);
+        var prm = YaelCryptoMarch1.DeriveParams(key, 1);
         // Encrypt an unpadded block whose last byte is 3: decrypting with padding must reject it.
-        var c = SigMix.EncryptWithParams([10, 3], prm, pad: false);
-        Assert.Throws<CryptographicException>(() => SigMix.DecryptWithParams(c, prm));
-        Assert.Throws<CryptographicException>(() => SigMix.Decrypt([1, 2, 3], key, 1));
+        var c = YaelCryptoMarch1.EncryptWithParams([10, 3], prm, pad: false);
+        Assert.Throws<CryptographicException>(() => YaelCryptoMarch1.DecryptWithParams(c, prm));
+        Assert.Throws<CryptographicException>(() => YaelCryptoMarch1.Decrypt([1, 2, 3], key, 1));
     }
 
     [Fact]
-    public void Lcg_HasFullPeriod_HullDobell() => Assert.Equal(256, SigMix.LcgPeriod());
+    public void Lcg_HasFullPeriod_HullDobell() => Assert.Equal(256, YaelCryptoMarch1.LcgPeriod());
 
     [Fact]
     public void Matrix_Determinant_Is_One_For_All_K_M()
@@ -106,10 +106,10 @@ public class CryptanalysisTests
     [Fact]
     public void LinearCongruence_And_ModInverse()
     {
-        Assert.Equal(205, SigMixCryptanalysis.ModInverse(5, 256)); // 5 · 205 = 1025 ≡ 1
-        Assert.Equal([3], SigMixCryptanalysis.SolveLinear(5, 15).ToArray());
-        Assert.Equal([1, 129], SigMixCryptanalysis.SolveLinear(2, 2).OrderBy(v => v).ToArray());
-        Assert.Empty(SigMixCryptanalysis.SolveLinear(2, 3));
+        Assert.Equal(205, Ycm1Cryptanalysis.ModInverse(5, 256)); // 5 · 205 = 1025 ≡ 1
+        Assert.Equal([3], Ycm1Cryptanalysis.SolveLinear(5, 15).ToArray());
+        Assert.Equal([1, 129], Ycm1Cryptanalysis.SolveLinear(2, 2).OrderBy(v => v).ToArray());
+        Assert.Empty(Ycm1Cryptanalysis.SolveLinear(2, 3));
     }
 
     [Fact]
@@ -117,13 +117,13 @@ public class CryptanalysisTests
     {
         for (var trial = 0; trial < 5; trial++)
         {
-            var secret = SigMix.DeriveParams(RandomNumberGenerator.GetBytes(32), (ulong)trial, rounds: 1);
+            var secret = YaelCryptoMarch1.DeriveParams(RandomNumberGenerator.GetBytes(32), (ulong)trial, rounds: 1);
             var p1 = "{\"t\":1760000000000,\"src\":\"sim\",\"bat\":{\"lvl\":0.5}}"u8.ToArray();
             var p2 = "{\"gps\":{\"lat\":19.5,\"lon\":-99.1}}"u8.ToArray();
-            var r = SigMixCryptanalysis.KnownPlaintextOneRound(p1, SigMix.EncryptWithParams(p1, secret));
+            var r = Ycm1Cryptanalysis.KnownPlaintextOneRound(p1, YaelCryptoMarch1.EncryptWithParams(p1, secret));
             Assert.NotNull(r.Params);
-            Assert.Equal(secret.Rounds[0].Rot % SigMix.Pad(p1).Length, r.Params!.Rounds[0].Rot);
-            var other = SigMixCryptanalysis.DecryptOther(r, SigMix.EncryptWithParams(p2, secret), b => b.Length > 0 && b[0] == (byte)'{' && b[^1] == (byte)'}');
+            Assert.Equal(secret.Rounds[0].Rot % YaelCryptoMarch1.Pad(p1).Length, r.Params!.Rounds[0].Rot);
+            var other = Ycm1Cryptanalysis.DecryptOther(r, YaelCryptoMarch1.EncryptWithParams(p2, secret), b => b.Length > 0 && b[0] == (byte)'{' && b[^1] == (byte)'}');
             Assert.Equal(p2, other);
         }
     }

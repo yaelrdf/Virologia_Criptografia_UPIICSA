@@ -1,5 +1,5 @@
 // SignalTrace v1 client protocol over Web Crypto (PLAN §6.3–6.4). Mirrors SignalTrace.Core in C#.
-import * as sigmix from "./sigmix.js";
+import * as ycm1 from "./ycm1.js";
 import { concat, fromB64, toB64, toHex, u64be, utf8, randomBytes } from "./util.js";
 
 const subtle = crypto.subtle;
@@ -37,7 +37,7 @@ export async function deriveKeys(z, nonceC, nonceS, suite = SUITE_AES) {
   return {
     suite,
     kAead: await hkdf(z, salt, suite === SUITE_CHACHA ? "st1/c20-up" : "st1/aes-up", 32),
-    kSig: await hkdf(z, salt, "st1/sigmix", 32),
+    kSig: await hkdf(z, salt, "st1/ycm1", 32),
     ivSalt: await hkdf(z, salt, "st1/iv-up", 4),
   };
 }
@@ -82,15 +82,15 @@ async function aeadDecrypt(keys, nonce, data, aad) {
   return new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, k, data));
 }
 
-/** sm = SigMix(pt, k_sig, seq); ct||tag = AEAD(k, iv_salt||u64be(seq), sm, "ST1"||did||seq||ts). */
+/** sm = Yael Crypto March1(pt, k_sig, seq); ct||tag = AEAD(k, iv_salt||u64be(seq), sm, "ST1"||did||seq||ts). */
 export async function seal(session, seq, ts, plaintext, trace = null) {
-  const sm = await sigmix.encrypt(plaintext, session.keys.kSig, seq, 3, trace);
+  const sm = await ycm1.encrypt(plaintext, session.keys.kSig, seq, 3, trace);
   return aeadEncrypt(session.keys, nonceFor(session.keys.ivSalt, seq), sm, aadFor(session.did, seq, ts));
 }
 
 export async function open(session, seq, ts, ct) {
   const sm = await aeadDecrypt(session.keys, nonceFor(session.keys.ivSalt, seq), ct, aadFor(session.did, seq, ts));
-  return sigmix.decrypt(sm, session.keys.kSig, seq);
+  return ycm1.decrypt(sm, session.keys.kSig, seq);
 }
 
 /** Builds the wire envelope for POST /api/telemetry. */

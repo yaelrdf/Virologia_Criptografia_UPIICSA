@@ -15,7 +15,7 @@ public sealed record PipelineResult(int Status, string Code, string? Message = n
 
 /// <summary>
 /// Receives an encrypted envelope (from HTTP or MQTT) and applies, in this order (PLAN §6.4):
-/// token did == envelope did → session lookup → seq freshness → AEAD tag → SigMix⁻¹ → payload validation →
+/// token did == envelope did → session lookup → seq freshness → AEAD tag → YCM1⁻¹ → payload validation →
 /// only then lastSeq update → persist → analytics → broadcast.
 /// </summary>
 public sealed class TelemetryPipeline(
@@ -133,7 +133,7 @@ public sealed class TelemetryPipeline(
         return new PipelineResult(202, "ok", null, env.Seq);
     }
 
-    /// <summary>Steps 4–6: AEAD tag, SigMix inverse and content validation. Returns the rejection, if any.</summary>
+    /// <summary>Steps 4–6: AEAD tag, YCM1 inverse and content validation. Returns the rejection, if any.</summary>
     private (int, string, string)? OpenAndValidate(CryptoSession session, TelemetryEnvelope env, byte[] ctBytes, PacketTraceData data,
         PacketTraceDto trace, out byte[] plain, out TelemetryPayload? payload)
     {
@@ -151,7 +151,7 @@ public sealed class TelemetryPipeline(
         }
         catch (CryptographicException)
         {
-            return (422, "invalid_payload", "Relleno SigMix inválido");
+            return (422, "invalid_payload", "Relleno YCM1 inválido");
         }
         var error = PayloadValidator.Validate(plain, env.Ts, out payload);
         if (error is null) return null;

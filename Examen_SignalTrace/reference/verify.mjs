@@ -2,7 +2,7 @@
 // Usage: node reference/verify.mjs
 import { readFileSync } from "node:fs";
 import { webcrypto as wc } from "node:crypto";
-import * as sigmix from "./sigmix.js";
+import * as ycm1 from "./ycm1.js";
 
 const subtle = wc.subtle;
 const V = JSON.parse(readFileSync(new URL("./test-vectors.json", import.meta.url)));
@@ -47,12 +47,12 @@ const sigOk = await subtle.verify({ name: "ECDSA", hash: "SHA-256" }, ltPub, hex
 check("ECDSA signature verifies", String(sigOk), "true");
 
 const pk = V.packet;
-const kSig = hex(hs.hkdf.outputs["st1/sigmix(32)"]);
-const { seed, prm } = await sigmix.deriveParams(kSig, pk.seq);
-check("SigMix params", JSON.stringify({ seed, rounds: prm }), JSON.stringify(pk.sigmix_params));
-const sm = await sigmix.encrypt(hex(pk.plaintext_hex), kSig, pk.seq);
-check("SigMix output", toHex(sm), pk.sigmix_output);
-check("SigMix decrypt", toHex(await sigmix.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
+const kSig = hex(hs.hkdf.outputs["st1/ycm1(32)"]);
+const { seed, prm } = await ycm1.deriveParams(kSig, pk.seq);
+check("YCM1 params", JSON.stringify({ seed, rounds: prm }), JSON.stringify(pk.ycm1_params));
+const sm = await ycm1.encrypt(hex(pk.plaintext_hex), kSig, pk.seq);
+check("YCM1 output", toHex(sm), pk.ycm1_output);
+check("YCM1 decrypt", toHex(await ycm1.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
 
 const aesKey = await subtle.importKey("raw", hex(pk.aes_gcm.key), "AES-GCM", false, ["encrypt"]);
 const nonce = cat(hex(hs.hkdf.outputs["st1/iv-up(4)"]), u64(pk.seq));
