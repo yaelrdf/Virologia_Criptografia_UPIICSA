@@ -44,6 +44,24 @@ ST_HTTPS_URL=https://<IP-del-host>:5443 docker compose -f deploy/docker-compose.
   - Si se pierde la llave, cambia la huella y los clientes que ya la fijaron rechazarán el servidor. Es lo correcto, porque una llave nueva no se distingue de un ataque.
 - Para producción, pon un proxy TLS delante (Caddy, Nginx o el túnel).
 
+## Detrás de Cloudflare Tunnel (o de otro proxy con TLS)
+
+Cloudflare termina el TLS, así que el túnel apunta al **HTTP** del contenedor y el HTTPS local (5443) no se usa:
+
+- en el panel del túnel: *Public hostname* → servicio `HTTP`, URL `signaltrace:8080` (o `localhost:<puerto publicado>`);
+- en el `.env`:
+
+  ```dotenv
+  PUBLIC_URL=https://signaltrace.example.com
+  HTTPS_ENABLED=false
+  ```
+
+  Si se usa un `compose.yml` propio, ponlo como `Server__PublicUrl: "${PUBLIC_URL}"` y `Https__Enabled: "false"`.
+
+Con `Server__PublicUrl`, el QR apunta a ese dominio y **no fija el certificado autofirmado**: la app Android valida el certificado de Cloudflare de forma normal. Aunque falte esa variable, el servidor detecta `X-Forwarded-Proto: https` y tampoco fija el certificado. MQTT (1883) no pasa por un túnel HTTP.
+
+Si la app muestra «TLS certificate does not match the pinned one», es que se vinculó con un QR que fijó el certificado local. Genera un QR nuevo en el dashboard y vuelve a escanearlo: la app reemplaza la URL y quita la fijación anterior.
+
 ## 3. Variables de entorno (`Seccion__Clave`)
 
 | Variable | Uso |

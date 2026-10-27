@@ -49,12 +49,16 @@ public static class LabEndpoints
         app.MapPost("/api/enroll", (HttpContext ctx, ClaimsPrincipal me, EnrollmentCodes codes, ServerIdentity id, IConfiguration cfg, LanHttps lan) =>
         {
             var (code, exp) = codes.Create(me.UserId());
-            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+            // Behind a TLS-terminating proxy (Cloudflare Tunnel, Caddy, Nginx) the request arrives over plain HTTP but the
+            // browser used https://{Host}: that is the address to share, and its certificate belongs to the proxy.
+            var viaHttpsProxy = string.Equals(ctx.Request.Headers["X-Forwarded-Proto"], "https", StringComparison.OrdinalIgnoreCase);
+            var origin = $"{(viaHttpsProxy ? "https" : ctx.Request.Scheme)}://{ctx.Request.Host}";
+            var publicUrl = cfg["Server:PublicUrl"] is { Length: > 0 } pub ? pub.TrimEnd('/') : null;
             // Base URL a phone can open: the public URL, else this HTTPS origin, else the LAN HTTPS address.
-            var url = cfg["Server:PublicUrl"] is { Length: > 0 } pub ? pub.TrimEnd('/')
-                : ctx.Request.IsHttps || lan.LanUrl is null ? origin
-                : lan.LanUrl;
-            var pinTls = lan.CertSha256 is not null && cfg["Server:PublicUrl"] is not { Length: > 0 } && url.StartsWith("https://", StringComparison.Ordinal);
+            var url = publicUrl ?? (ctx.Request.IsHttps || viaHttpsProxy || lan.LanUrl is null ? origin : lan.LanUrl);
+            // Pin the self-signed certificate only when the phone will really talk to our own LAN HTTPS endpoint.
+            var ownTls = url == lan.LanUrl || (ctx.Request.IsHttps && ctx.Connection.LocalPort == lan.Port);
+            var pinTls = lan.CertSha256 is not null && publicUrl is null && !viaHttpsProxy && ownTls;
             // QR content: an ordinary URL. Any phone camera opens the web agent; the Android app reads the same link.
             // The fragment (#…) never reaches the server: code, pinned key fingerprint and TLS certificate hash.
             var qr = $"{url}/agent.html#enroll={code}&fp={id.Fingerprint}" + (pinTls ? $"&tls={lan.CertSha256}" : "");
