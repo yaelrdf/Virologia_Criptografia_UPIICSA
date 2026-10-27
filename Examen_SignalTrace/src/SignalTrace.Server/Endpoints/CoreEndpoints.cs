@@ -22,6 +22,16 @@ public static class CoreEndpoints
 {
     public static readonly string[] DeviceKinds = ["web", "android", "sim"];
     private static readonly byte[] DummySalt = new byte[16], DummyHash = new byte[32];
+    private const string PasswordAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+    private static string? PasswordError(string? password)
+        => (password ?? "").Length is < 8 or > 128 ? "La contraseña debe tener entre 8 y 128 caracteres" : null;
+
+    private static void SetPassword(User user, string password, PasswordHasher hasher)
+    {
+        var (salt, it, hash) = hasher.Hash(password);
+        (user.Salt, user.Iterations, user.PasswordHash) = (salt, it, hash);
+    }
 
     public static void MapCore(this WebApplication app)
     {
@@ -51,6 +61,20 @@ public static class CoreEndpoints
         api.MapGet("/auth/me", (ClaimsPrincipal u) => Results.Ok(new { username = u.FindFirstValue("name"), role = u.FindFirstValue("role") }))
             .RequireAuthorization("user");
 
+        // Any signed-in user changes their own password: the current one is verified with PBKDF2 first.
+        api.MapPost("/auth/change-password", async (ChangePasswordRequest req, AppDb db, PasswordHasher hasher, ClaimsPrincipal me) =>
+        {
+            var user = await db.Users.FindAsync(me.UserId());
+            if (user is null) return Http.Error(404, "not_found", "Usuario inexistente");
+            if (!PasswordHasher.Verify(req.Current ?? "", user.Salt, user.Iterations, user.PasswordHash))
+                return Http.Error(400, "wrong_password", "La contraseña actual no es correcta");
+            if (PasswordError(req.New) is { } err) return Http.Error(400, "malformed", err);
+            if (req.New == req.Current) return Http.Error(400, "malformed", "La contraseña nueva debe ser distinta de la actual");
+            SetPassword(user, req.New!, hasher);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }).RequireAuthorization("user").RequireRateLimiting("login");
+
         api.MapGet("/server-key", (ServerIdentity id, IConfiguration cfg) =>
             Results.Ok(new ServerKeyResponse(Convert.ToBase64String(id.PublicKey), id.Fingerprint, SupportedSuites(cfg))));
 
@@ -60,7 +84,7 @@ public static class CoreEndpoints
             var name = req.Username?.Trim() ?? "";
             if (name.Length is < 3 or > 32 || !name.All(c => char.IsLetterOrDigit(c) || c is '_' or '.' or '-'))
                 return Http.Error(400, "malformed", "El usuario debe tener 3–32 caracteres alfanuméricos");
-            if ((req.Password ?? "").Length < 8) return Http.Error(400, "malformed", "La contraseña debe tener al menos 8 caracteres");
+            if (PasswordError(req.Password) is { } err) return Http.Error(400, "malformed", err);
             if (!Roles.IsValid(req.Role)) return Http.Error(400, "malformed", "Rol inválido (admin | viewer)");
             if (await db.Users.AnyAsync(u => u.Username == name)) return Http.Error(409, "conflict", "El usuario ya existe");
             var (salt, it, hash) = hasher.Hash(req.Password!);
@@ -79,6 +103,29 @@ public static class CoreEndpoints
             if (id == me.UserId()) return Http.Error(400, "malformed", "No puedes eliminar tu propio usuario");
             var n = await db.Users.Where(u => u.Id == id).ExecuteDeleteAsync();
             return n == 0 ? Http.Error(404, "not_found", "Usuario inexistente") : Results.NoContent();
+        }).RequireAuthorization("admin");
+
+        api.MapPut("/users/{id:int}/role", async (int id, ChangeRoleRequest req, AppDb db) =>
+        {
+            if (!Roles.IsValid(req.Role)) return Http.Error(400, "malformed", "Rol inválido (admin | viewer)");
+            var user = await db.Users.FindAsync(id);
+            if (user is null) return Http.Error(404, "not_found", "Usuario inexistente");
+            if (user.Role == Roles.Admin && req.Role != Roles.Admin && await db.Users.CountAsync(u => u.Role == Roles.Admin) == 1)
+                return Http.Error(400, "last_admin", "Debe quedar al menos un administrador");
+            user.Role = req.Role;
+            await db.SaveChangesAsync();
+            return Results.Ok(new { user.Id, user.Username, user.Role });
+        }).RequireAuthorization("admin");
+
+        // The new random password is returned once; only its PBKDF2 hash is stored.
+        api.MapPost("/users/{id:int}/reset-password", async (int id, AppDb db, PasswordHasher hasher) =>
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user is null) return Http.Error(404, "not_found", "Usuario inexistente");
+            var password = RandomNumberGenerator.GetString(PasswordAlphabet, 16);
+            SetPassword(user, password, hasher);
+            await db.SaveChangesAsync();
+            return Results.Ok(new ResetPasswordResponse(user.Username, password));
         }).RequireAuthorization("admin");
 
         // ---- Devices
@@ -111,7 +158,6 @@ public static class CoreEndpoints
             sessions.RemoveDevice(id.ToString("D"));
             analytics.Forget(id);
             await db.Readings.Where(r => r.DeviceId == id).ExecuteDeleteAsync();
-            await db.Alerts.Where(a => a.DeviceId == id).ExecuteDeleteAsync();
             await db.Devices.Where(d => d.Id == id).ExecuteDeleteAsync();
             return Results.NoContent();
         }).RequireAuthorization("admin");

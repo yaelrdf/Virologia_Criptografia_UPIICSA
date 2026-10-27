@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace SignalTrace.Server.Tests;
 
-/// <summary>Dashboard data endpoints: interpolated grid, heatmap, exports and alerts.</summary>
+/// <summary>Dashboard data endpoints: interpolated grid, sensor-bank columns and CSV export.</summary>
 public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
 {
     private static async Task<JsonElement> Get(HttpClient http, string token, string url)
@@ -43,28 +43,28 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     }
 
     [Fact]
-    public async Task Heatmap_Exports_And_LowSignalAlert()
+    public async Task SensorBank_Columns_And_CsvExport()
     {
         var http = fx.Factory.CreateClient();
         var admin = await TestDevice.Login(http);
         var dev = await TestDevice.Create(http, admin);
         await dev.Handshake();
-        Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\",\"gps\":{\"lat\":19.3955,\"lon\":-99.0915},\"wifi\":{\"rssi\":-88}}"))).StatusCode);
-        Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\",\"gps\":{\"lat\":19.39551,\"lon\":-99.09151},\"wifi\":{\"rssi\":-60}}"))).StatusCode);
+        const string sensors = ",\"gyr\":{\"x\":0.3,\"y\":0,\"z\":0.4},\"mfl\":{\"x\":20,\"y\":-5,\"z\":-40},\"env\":{\"lux\":150,\"prx\":5,\"hpa\":780.5,\"tmp\":24,\"hum\":40},\"stp\":{\"n\":12},\"wifi\":{\"rssi\":-61,\"tx\":433,\"rx\":390}";
+        Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\"" + sensors + "}"))).StatusCode);
+        var bad = dev.Seal("{\"t\":$T,\"src\":\"sim\",\"env\":{\"hum\":140}}");
+        Assert.Equal((HttpStatusCode)422, (await dev.Send(bad)).StatusCode);
 
-        var h = await Get(http, admin, $"/api/heatmap?deviceId={dev.DeviceId}&cellM=25");
-        var cell = Assert.Single(h.GetProperty("cells").EnumerateArray());
-        Assert.Equal(-74, cell.GetProperty("mean").GetDouble());
+        var r = (await Get(http, admin, $"/api/readings?deviceId={dev.DeviceId}"))[0];
+        Assert.Equal(0.5, r.GetProperty("gyrNorm").GetDouble(), 6);
+        Assert.Equal(780.5, r.GetProperty("hpa").GetDouble());
+        Assert.Equal(12, r.GetProperty("p").GetProperty("stp").GetProperty("n").GetInt32());
+        var grid = await Get(http, admin, $"/api/readings/grid?deviceId={dev.DeviceId}&field=lux");
+        Assert.Equal(150, grid.GetProperty("points")[0].GetProperty("v").GetDouble());
 
-        var alerts = await Get(http, admin, $"/api/alerts?deviceId={dev.DeviceId}");
-        Assert.Contains(alerts.EnumerateArray(), a => a.GetProperty("kind").GetString() == "low_signal");
-
-        foreach (var (path, needle) in new[] { ("readings.csv", "ts_device,ts_server"), ("track.geojson", "LineString"), ("track.kml", "<coordinates>") })
-        {
-            var req = new HttpRequestMessage(HttpMethod.Get, $"/api/export/{path}?deviceId={dev.DeviceId}");
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
-            var body = await (await http.SendAsync(req)).Content.ReadAsStringAsync();
-            Assert.Contains(needle, body);
-        }
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/export/readings.csv?deviceId={dev.DeviceId}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
+        var csv = await (await http.SendAsync(req)).Content.ReadAsStringAsync();
+        Assert.StartsWith("ts_device,ts_server,seq,src,acc_rms,gyr_norm,lux,hpa", csv);
+        Assert.DoesNotContain("lat", csv);
     }
 }

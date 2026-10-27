@@ -11,7 +11,7 @@ using SignalTrace.Server.Services;
 
 namespace SignalTrace.Server.Endpoints;
 
-/// <summary>Decrypted readings, time grid with interpolation, alerts, packet history, exports and coverage heatmap.</summary>
+/// <summary>Decrypted readings, time grid with interpolation, packet history, statistics and CSV export.</summary>
 public static class DataEndpoints
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -32,7 +32,7 @@ public static class DataEndpoints
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
             var selector = FieldSelector(field);
-            if (selector is null) return Http.Error(400, "malformed", "field: rssi | rtt | loss | rms | battery | speed");
+            if (selector is null) return Http.Error(400, "malformed", "field: rssi | rtt | loss | rms | battery | gyr | lux | hpa");
             var device = await db.Devices.FindAsync(deviceId);
             var rows = await Query(db, deviceId, from, to, 2000);
             var samples = rows.Select(r => (r.TsDevice, V: selector(r))).Where(x => x.V is not null).Select(x => (x.TsDevice, x.V!.Value)).ToList();
@@ -49,24 +49,6 @@ public static class DataEndpoints
                 interpolatedCount = grid.Count(g => g.Interpolated),
                 gapCount = grid.Count(g => g.Value is null),
             });
-        });
-
-        api.MapGet("/alerts", async (Guid? deviceId, int? limit, AppDb db, ClaimsPrincipal me) =>
-        {
-            var visible = await VisibleDevices(db, me);
-            var q = db.Alerts.Where(a => visible.Keys.Contains(a.DeviceId));
-            if (deviceId is { } id) q = q.Where(a => a.DeviceId == id);
-            var list = await q.OrderByDescending(a => a.Ts).Take(Math.Clamp(limit ?? 100, 1, 1000)).ToListAsync();
-            return Results.Ok(list.Select(a => AlertDto.From(a, visible[a.DeviceId])));
-        });
-
-        api.MapPost("/alerts/{id:long}/ack", async (long id, AppDb db, ClaimsPrincipal me) =>
-        {
-            var a = await db.Alerts.FindAsync(id);
-            if (a is null || !await CanSee(db, me, a.DeviceId)) return Http.Error(404, "not_found", "Alerta inexistente");
-            a.Acknowledged = true;
-            await db.SaveChangesAsync();
-            return Results.NoContent();
         });
 
         app.MapGet("/api/packets", async (Guid? deviceId, int? limit, string? status, AppDb db) =>
@@ -96,53 +78,10 @@ public static class DataEndpoints
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
             var rows = await Query(db, deviceId, from, to, 100_000);
-            var sb = new StringBuilder("ts_device,ts_server,seq,src,lat,lon,acc,spd,acc_rms,bat_lvl,net_type,probe_rtt,probe_loss,wifi_rssi,cell_dbm,cell_type\n");
+            var sb = new StringBuilder("ts_device,ts_server,seq,src,acc_rms,gyr_norm,lux,hpa,bat_lvl,net_type,probe_rtt,probe_loss,wifi_rssi,cell_dbm,cell_type\n");
             foreach (var r in rows)
-                sb.AppendJoin(',', r.TsDevice, r.TsServer, r.Seq, r.Src, N(r.Lat), N(r.Lon), N(r.Acc), N(r.Spd), N(r.AccRms), N(r.BatLvl), r.NetType, N(r.ProbeRtt), N(r.ProbeLoss), r.WifiRssi, r.CellDbm, r.CellType).Append('\n');
+                sb.AppendJoin(',', r.TsDevice, r.TsServer, r.Seq, r.Src, N(r.AccRms), N(r.GyrNorm), N(r.Lux), N(r.Hpa), N(r.BatLvl), r.NetType, N(r.ProbeRtt), N(r.ProbeLoss), r.WifiRssi, r.CellDbm, r.CellType).Append('\n');
             return Results.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", $"readings-{deviceId:D}.csv");
-        });
-
-        api.MapGet("/export/track.geojson", async (Guid deviceId, long? from, long? to, AppDb db, ClaimsPrincipal me) =>
-        {
-            if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
-            var fixes = (await Query(db, deviceId, from, to, 100_000)).Where(r => r.Lat is not null).ToList();
-            var features = new List<object>
-            {
-                new { type = "Feature", properties = new { name = "ruta", points = fixes.Count },
-                      geometry = new { type = "LineString", coordinates = fixes.Select(r => new[] { r.Lon!.Value, r.Lat!.Value }) } },
-            };
-            features.AddRange(fixes.Select(r => (object)new
-            {
-                type = "Feature",
-                properties = new { ts = r.TsDevice, rssi = r.WifiRssi ?? r.CellDbm, src = r.Src },
-                geometry = new { type = "Point", coordinates = new[] { r.Lon!.Value, r.Lat!.Value } },
-            }));
-            var json = JsonSerializer.Serialize(new { type = "FeatureCollection", features });
-            return Results.File(Encoding.UTF8.GetBytes(json), "application/geo+json", $"track-{deviceId:D}.geojson");
-        });
-
-        api.MapGet("/export/track.kml", async (Guid deviceId, long? from, long? to, AppDb db, ClaimsPrincipal me) =>
-        {
-            if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
-            var fixes = (await Query(db, deviceId, from, to, 100_000)).Where(r => r.Lat is not null).ToList();
-            var coords = string.Join(' ', fixes.Select(r => $"{N(r.Lon)},{N(r.Lat)},0"));
-            var kml = $"""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>SignalTrace {deviceId:D}</name>
-                <Placemark><name>Ruta</name><LineString><tessellate>1</tessellate><coordinates>{coords}</coordinates></LineString></Placemark>
-                </Document></kml>
-                """;
-            return Results.File(Encoding.UTF8.GetBytes(kml), "application/vnd.google-earth.kml+xml", $"track-{deviceId:D}.kml");
-        });
-
-        // Coverage heatmap: mean signal per grid cell (cellM metres), computed on the server.
-        api.MapGet("/heatmap", async (Guid deviceId, double? cellM, AppDb db, ClaimsPrincipal me) =>
-        {
-            if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
-            var size = Math.Clamp(cellM ?? 25, 5, 1000);
-            var rows = (await Query(db, deviceId, null, null, 100_000)).Where(r => r.Lat is not null && (r.WifiRssi ?? r.CellDbm) is not null).ToList();
-            var cells = Heatmap.Build(rows.Select(r => (r.Lat!.Value, r.Lon!.Value, (double)(r.WifiRssi ?? r.CellDbm)!.Value)), size);
-            return Results.Ok(new { cellM = size, cells });
         });
     }
 
@@ -155,7 +94,9 @@ public static class DataEndpoints
         "loss" => r => r.ProbeLoss,
         "rms" => r => r.AccRms,
         "battery" => r => r.BatLvl,
-        "speed" => r => r.Spd,
+        "gyr" => r => r.GyrNorm,
+        "lux" => r => r.Lux,
+        "hpa" => r => r.Hpa,
         _ => null,
     };
 
@@ -180,22 +121,4 @@ public static class DataEndpoints
 
     private static async Task<Dictionary<Guid, string>> VisibleDevices(AppDb db, ClaimsPrincipal me)
         => await db.Devices.Where(d => me.IsAdmin() || d.OwnerUserId == me.UserId()).ToDictionaryAsync(d => d.Id, d => d.Name);
-}
-
-public static class Heatmap
-{
-    public sealed record Cell(double Lat, double Lon, double Mean, int Count);
-
-    /// <summary>Equirectangular grid: Δlat = size / R, Δlon = size / (R cos φ). Mean signal per cell.</summary>
-    public static List<Cell> Build(IEnumerable<(double Lat, double Lon, double V)> points, double sizeM)
-    {
-        var list = points.ToList();
-        if (list.Count == 0) return [];
-        var lat0 = list.Average(p => p.Lat) * Math.PI / 180;
-        var dLat = sizeM / Numeric.EarthRadiusM * 180 / Math.PI;
-        var dLon = dLat / Math.Max(0.01, Math.Cos(lat0));
-        return list.GroupBy(p => (Math.Floor(p.Lat / dLat), Math.Floor(p.Lon / dLon)))
-            .Select(g => new Cell((g.Key.Item1 + 0.5) * dLat, (g.Key.Item2 + 0.5) * dLon, Math.Round(g.Average(p => p.V), 1), g.Count()))
-            .ToList();
-    }
 }

@@ -119,7 +119,7 @@ public class CryptanalysisTests
         {
             var secret = YaelCryptoMarch1.DeriveParams(RandomNumberGenerator.GetBytes(32), (ulong)trial, rounds: 1);
             var p1 = "{\"t\":1760000000000,\"src\":\"sim\",\"bat\":{\"lvl\":0.5}}"u8.ToArray();
-            var p2 = "{\"gps\":{\"lat\":19.5,\"lon\":-99.1}}"u8.ToArray();
+            var p2 = "{\"env\":{\"lux\":412,\"hpa\":779.3}}"u8.ToArray();
             var r = Ycm1Cryptanalysis.KnownPlaintextOneRound(p1, YaelCryptoMarch1.EncryptWithParams(p1, secret));
             Assert.NotNull(r.Params);
             Assert.Equal(secret.Rounds[0].Rot % YaelCryptoMarch1.Pad(p1).Length, r.Params!.Rounds[0].Rot);

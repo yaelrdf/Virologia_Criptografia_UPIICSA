@@ -18,16 +18,3 @@ public static class Entropy
         return h;
     }
 }
-
-/// <summary>Byte-wise Caesar shift: an insecure classical cipher shown in the console only as a didactic contrast.</summary>
-public static class Caesar
-{
-    public static byte[] Encrypt(ReadOnlySpan<byte> data, int shift)
-    {
-        var o = new byte[data.Length];
-        for (var i = 0; i < data.Length; i++) o[i] = (byte)((data[i] + shift) & 0xFF);
-        return o;
-    }
-
-    public static byte[] Decrypt(ReadOnlySpan<byte> data, int shift) => Encrypt(data, -shift);
-}
