@@ -1,7 +1,7 @@
 digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
   rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
   s [label="Entrada: C, k_sig, seq", shape=oval, fillcolor="#DCEAF7"];
-  h [label="Mismos parámetros: seed, (k, m, rot) × 3 = SHA-256(k_sig || seq || \"SigMix\")"];
+  h [label="Mismos parámetros: seed, (k, m, rot) × 3 = SHA-256(k_sig || seq || \"Yael Crypto March1\")"];
   ks [label="Regenerar las 3 filas de flujo EN ORDEN\n(ronda 1, 2, 3) con el mismo s continuo"];
   init [label="r ← 2"];
   rt [label="1) rotarDer(p, rot mod n)"];

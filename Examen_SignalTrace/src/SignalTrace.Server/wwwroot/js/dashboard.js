@@ -16,6 +16,8 @@ const st = {
   selected: null,
   range: store.read("st.dash.range") ?? 15,   // minutes of history
   readings: 0,
+  loading: false,           // while the history loads, live readings wait in `pending` (charts need sorted x)
+  pending: [],
   spectrum: null,
   last: null,
 };
@@ -237,12 +239,16 @@ $("range").addEventListener("click", (e) => {
 
 async function loadHistory() {
   const id = st.selected;
+  st.loading = true; st.pending = [];
   st.readings = 0; st.last = null; motWindow.length = 0;
   [...LIVE_CHARTS, chGrid].forEach(C.clear);
   const from = Date.now() - st.range * 60_000;
-  const rows = await api(`/api/readings?deviceId=${id}&from=${from}&limit=100000&maxPoints=${MAX_POINTS}`);
+  const rows = await api(`/api/readings?deviceId=${id}&from=${from}&limit=100000&maxPoints=${MAX_POINTS}`).finally(() => { st.loading = false; });
   if (id !== st.selected) return;
   rows.forEach((r) => addReading(r, false));
+  const lastTs = rows.at(-1)?.ts ?? 0;
+  st.pending.filter((r) => r.ts > lastTs).forEach((r) => addReading(r, false));
+  st.pending = [];
   LIVE_CHARTS.forEach((c) => c.update("none"));
   const label = st.range < 60 ? `${st.range} min` : `${st.range / 60} h`;
   $("history-note").textContent = rows.length
@@ -323,7 +329,10 @@ hub.on("DeviceStatus", (id, s) => {
   renderDevices();
   if (isNew && !st.selected) select(id);
 });
-hub.on("Reading", (id, r) => { if (id === st.selected) addReading(r); });
+hub.on("Reading", (id, r) => {
+  if (id !== st.selected) return;
+  if (st.loading) st.pending.push(r); else addReading(r);
+});
 hub.on("Spectrum", (id, freqs, mags, dominant) => { if (id === st.selected) renderSpectrum(freqs, mags, dominant); });
 hub.onreconnecting(() => setLive("warn", "Reconectando…"));
 hub.onreconnected(() => { setLive("ok", "En vivo"); if (st.selected) hub.invoke("Subscribe", st.selected); });

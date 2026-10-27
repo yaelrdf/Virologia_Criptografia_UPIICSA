@@ -6,11 +6,11 @@ digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontna
   c2 [label="¿Existe la sesión sid de ese dispositivo?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
   c3 [label="¿seq > último aceptado?\n(o libre en la ventana de 64)", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
   c4 [label="Recalcular nonce y AAD;\n¿etiqueta AEAD válida?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
-  c5 [label="SigMix⁻¹ (3 rondas inversas) y quitar relleno;\n¿JSON y rangos válidos? ¿t = ts?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
+  c5 [label="Yael Crypto March1⁻¹ (3 rondas inversas) y quitar relleno;\n¿JSON y rangos válidos? ¿t = ts?", shape=diamond, fillcolor="#FFF4E5", color="#9A6700"];
   acc [label="Solo ahora: último seq ← seq", fillcolor="#E6F4EA", color="#1A7F37"];
   per [label="Guardar lectura (y paquete ok) en SQLite\n(opcional: cifrado en reposo AES-GCM)"];
-  an [label="Analítica + alertas"];
-  bc [label="SignalR: Reading, DeviceStatus, Alert,\nSpectrum, PacketTrace"];
+  an [label="Analítica (EMA, z-score,\nregresión, DFT)"];
+  bc [label="SignalR: Reading, DeviceStatus,\nSpectrum, PacketTrace"];
   out [label="202 {ack: seq}", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
   e400 [label="400 malformed", fillcolor="#FDECEC", color="#C62828"];
   e401 [label="401 unauthorized", fillcolor="#FDECEC", color="#C62828"];

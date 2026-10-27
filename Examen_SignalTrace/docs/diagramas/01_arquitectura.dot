@@ -2,20 +2,20 @@ digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontna
   rankdir=LR; compound=true; bgcolor="white"; nodesep=0.35; ranksep=0.7;
   node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
   subgraph cluster_clients { label="Clientes (mismo protocolo ST1)"; style="rounded,dashed"; color="#8899AA";
-    web [label="Agente web / PWA\n(Web Crypto, sensores del navegador)"];
-    android [label="App Android (Kotlin)\nservicio en primer plano\nWi-Fi, celular, GPS"];
+    web [label="Agente web / PWA\n(Web Crypto, sensores elegidos\npor el usuario)"];
+    android [label="App Android (Kotlin)\nservicio en primer plano\nbanco completo de sensores"];
     sim [label="Simulador CLI (.NET)\nN dispositivos, HTTP o MQTT"];
   }
   subgraph cluster_server { label="Servidor ASP.NET Core (.NET 10)"; style="rounded"; color="#0F6CBD";
-    api [label="Minimal API\n/api/auth · /api/handshake · /api/telemetry"];
+    api [label="Minimal API · HTTP :5090 y HTTPS :5443\n/api/auth · /api/enroll · /api/handshake\n/api/telemetry · /api/users"];
     mqtt [label="Broker MQTT embebido\nst/{deviceId}/up"];
-    pipe [label="Pipeline de recepción\ntoken → sesión → seq → etiqueta AEAD\n→ SigMix⁻¹ → validación", fillcolor="#FFF4E5", color="#9A6700"];
-    an [label="Analítica (métodos numéricos)\nEMA, z-score, DFT/FFT,\ninterpolación, regresión, Haversine"];
+    pipe [label="Pipeline de recepción\ntoken → sesión → seq → etiqueta AEAD\n→ Yael Crypto March1⁻¹ → validación", fillcolor="#FFF4E5", color="#9A6700"];
+    an [label="Analítica (métodos numéricos)\nEMA, z-score, DFT/FFT,\ninterpolación, regresión"];
     hub [label="SignalR /hubs/live"];
-    db [label="SQLite (EF Core)\nUsers · Devices · Readings\nPackets · Alerts", shape=cylinder];
+    db [label="SQLite (EF Core)\nUsers · Devices\nReadings · Packets", shape=cylinder];
     keys [label="Sesiones en memoria\n(k_aes, k_sig, iv_salt)\nnunca se guardan", shape=note, fillcolor="#FDECEC", color="#C62828"];
   }
-  ui [label="Dashboard · Consola admin\nLaboratorio · Usuarios\n(HTML + JS)"];
+  ui [label="Dashboard (en vivo + historial)\nConsola admin · Laboratorio\nUsuarios (HTML + JS)"];
   web -> api [label="POST sobre cifrado"]; android -> api [label="POST sobre cifrado"]; sim -> api; sim -> mqtt [style=dashed, label="MQTT"];
   api -> pipe; mqtt -> pipe; pipe -> keys [dir=both, style=dotted];
   pipe -> db; pipe -> an; an -> db; an -> hub; pipe -> hub [label="PacketTrace"]; hub -> ui [label="WebSocket"]; ui -> api [label="REST + JWT", style=dashed];

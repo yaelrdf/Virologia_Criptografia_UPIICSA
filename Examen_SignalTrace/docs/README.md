@@ -9,7 +9,7 @@ Los capítulos están en Markdown y son la única fuente del documento Word de l
 | `02-algoritmos.md` | Cada algoritmo: para qué se usa, idea matemática, pasos, pseudocódigo, ejemplo numérico y archivo |
 | `03-escenarios.md` | Escenarios normales y de ataque (Eve y Mallory) con resultados |
 | `04-android-y-api.md` | App Android (sistema híbrido) y API REST |
-| `05-criptoanalisis-sigmix.md` | Por qué SigMix no es seguro solo; ataque de texto claro conocido |
+| `05-criptoanalisis-ycm1.md` | Por qué Yael Crypto March1 no es seguro solo; ataque de texto claro conocido |
 | `06-matematicas.md` | Álgebra lineal, matemáticas discretas y métodos numéricos aplicados |
 | `07-manual.md` | Instalación y uso |
 | `08-limitaciones.md` | Modelo de amenazas, límites, lo que no se probó, ética |
@@ -25,7 +25,7 @@ Los capítulos están en Markdown y son la única fuente del documento Word de l
 - `capturas/`: capturas del sistema en ejecución. Las toma `tools/capturas.mjs` con puppeteer-core y el Firefox del sistema. Necesitan el servidor y el simulador corriendo:
 
   ```bash
-  ST_PASSWORD=... node tools/capturas.mjs http://localhost:5090
+  ST_PASSWORD='SignalTrace2026!' node tools/capturas.mjs http://localhost:5090
   ```
 
 - `word/generar_documento.js`: genera `Documentacion_Sistema_SignalTrace.docx`.

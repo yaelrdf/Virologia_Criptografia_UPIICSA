@@ -13,7 +13,7 @@ const DOCS = path.resolve(__dirname, "..");
 const OUT = process.argv[2] ?? path.join(__dirname, "Documentacion_Sistema_SignalTrace.docx");
 const CHAPTERS = [
   "00-introduccion.md", "01-arquitectura.md", "02-algoritmos.md", "03-escenarios.md", "04-android-y-api.md",
-  "05-criptoanalisis-sigmix.md", "06-matematicas.md", "07-manual.md", "08-limitaciones.md", "09-pruebas.md", "10-conclusiones.md",
+  "05-criptoanalisis-ycm1.md", "06-matematicas.md", "07-manual.md", "08-limitaciones.md", "09-pruebas.md", "10-conclusiones.md",
 ];
 
 const center = (text, opts = {}) => new Paragraph({
@@ -34,7 +34,7 @@ function cover() {
     center("SignalTrace", { size: 64, bold: true, color: L.ACCENT, after: 120 }),
     center("Sistema de rastreo de señales con telemetría cifrada", { size: 30, after: 120 }),
     center("Proyecto del segundo parcial: «Inventar un algoritmo de encriptación»", { size: 24, after: 120 }),
-    center("SigMix (algoritmo propio) + AES-256-GCM · ECDH P-256 + HKDF · ECDSA · PBKDF2 · HMAC-SHA256 · ChaCha20-Poly1305", { size: 20, color: "555555", after: 900 }),
+    center("Yael Crypto March1 (algoritmo propio) + AES-256-GCM · ECDH P-256 + HKDF · ECDSA · PBKDF2 · HMAC-SHA256 · ChaCha20-Poly1305", { size: 20, color: "555555", after: 900 }),
     center("Integrantes: ____________________________________________", { size: 24, after: 200 }),
     center("____________________________________________", { size: 24, after: 200 }),
     center("Profesor(a): ____________________________________________", { size: 24, after: 600 }),

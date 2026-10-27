@@ -6,10 +6,13 @@ services:
       dockerfile: deploy/Dockerfile
     ports:
       - "8080:8080"
+      - "5443:5443"
       - "1883:1883"
     environment:
       Admin__Password: "${ADMIN_PASSWORD:-SignalTrace2026!}"
       Mqtt__Enabled: "true"
+      # Inside the container the LAN IP is unknown: set the host's address so the QR points to it.
+      Https__AdvertiseUrl: "${ST_HTTPS_URL:-}"
       Lab__Enabled: "${LAB_ENABLED:-true}"
       Storage__EncryptAtRest: "${ENCRYPT_AT_REST:-false}"
     volumes:

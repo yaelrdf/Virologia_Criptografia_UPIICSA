@@ -1,5 +1,5 @@
 // Screenshots for the documentation, taken from the running system with the system Firefox (WebDriver BiDi).
-//   ST_PASSWORD=... node docs/tools/capturas.mjs [http://localhost:5090]
+//   ST_PASSWORD='SignalTrace2026!' node docs/tools/capturas.mjs [http://localhost:5090]
 // Start the server and, for live data, the simulator (--anomalies --gaps) before running it.
 import puppeteer from "puppeteer-core";
 import { mkdirSync } from "node:fs";
@@ -69,24 +69,21 @@ await go("agent.html", 2000);
 if (await page.$("#register")) { await page.click("#register"); await sleep(1500); }
 if (await page.$("#pinok")) { await page.click("#pinok"); await page.click("#dopin"); await sleep(800); }
 await page.evaluate(() => { const s = document.getElementById("src-sim"); if (!s.checked) s.click(); });
+await sleep(500);
+await shotOf("web_agente_sensores", ["section:has(> #sensors-count), section:has(#sensors)"]);
 await page.click("#start");
 await sleep(9000);
 await shotOf("web_agente", ["#payload", "#wire"].map((s) => `section:has(> ${s})`));
 await shot("web_agente_completo", { fullPage: true });
 await page.click("#start"); // stop
 
-// Dashboard
+// Dashboard: live values of the selected device and its history.
 await go("app.html", 7000);
 await shot("web_dashboard");
-await page.evaluate(() => document.getElementById("map").scrollIntoView({ block: "center" }));
-await sleep(4000); // OSM tiles
-await shotOf("web_mapa", ["section:has(> #map)"]);
-await page.evaluate(() => { const c = document.getElementById("layer-heat"); c.click(); });
-await sleep(2500);
-await shotOf("web_mapa_calor", ["section:has(> #map)"]);
-await shotOf("web_dashboard_graficas", ["#device-view .grid.auto > section:nth-child(-n+5)"]);
+await shotOf("web_dashboard_vivo", ["#live-card"]);
+await shotOf("web_dashboard_graficas", ["#device-view .grid.auto > section:nth-child(-n+4)"]);
+await shotOf("web_dashboard_historial", ["section.card:has(#range)", "section.chart-card:has(#c-ori)", "section.chart-card:has(#c-lux)", "section.chart-card:has(#c-hpa)", "section.chart-card:has(#c-gyr)"]);
 await shotOf("web_dashboard_malla", ["section.chart-card:has(#c-grid)"]);
-await shotOf("web_alertas", ["aside section:has(#alerts)"]);
 await page.click("#qr-btn");
 await sleep(1200);
 await shotOf("web_qr", ["#qr-dialog"], 4);
@@ -110,9 +107,9 @@ await sleep(800);
 await shot("web_consola");
 await page.evaluate(() => { document.querySelector('#s-rounds button[data-i="2"]')?.click(); document.querySelector(".stage[data-stage=ycm1]").scrollIntoView(); });
 await sleep(600);
-await shotOf("web_consola_sigmix", ['.stage[data-stage="ycm1"]']);
+await shotOf("web_consola_ycm1", ['.stage[data-stage="ycm1"]']);
 await shotOf("web_consola_aead", ['.stage[data-stage="wire"]', '.stage[data-stage="verify"]', '.stage[data-stage="aead"]']);
-await shotOf("web_consola_entropia", ["section.card:has(> .chart-box > #c-ent)", "section.card:has(> #c-hex)"]);
+await shotOf("web_consola_entropia", ["section.card:has(> .chart-box > #c-ent)"]);
 await page.evaluate(() => {
   const b = [...document.querySelectorAll("#pkts button")].find((x) => x.textContent.includes("auth_failed"));
   b?.click();
@@ -120,9 +117,24 @@ await page.evaluate(() => {
 await sleep(600);
 await shotOf("web_consola_rechazo", ['.stage[data-stage="wire"]', '.stage[data-stage="verify"]']);
 
-// Users and API
-await go("admin.html", 2500);
+// Users: a viewer to manage, its password reset (shown once) and the own-password dialog.
+await go("admin.html", 1500);
+await page.evaluate(async () => {
+  const token = JSON.parse(localStorage.getItem("st.auth")).token;
+  await fetch("/api/users", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "profesor", password: "Profesor-2026", role: "viewer" }) });
+});
+await go("admin.html", 2000);
+await page.evaluate(() => { window.confirm = () => true; document.querySelector("button[data-reset]")?.click(); });
+await sleep(1200);
 await shot("web_usuarios");
+await page.evaluate(() => document.getElementById("reset-close").click());
+await page.evaluate(() => { document.querySelector(".user-menu").open = true; document.getElementById("pw-open").click(); });
+await sleep(600);
+await shotOf("web_cambiar_contrasena", ["dialog.modal[open]"], 4);
+await page.keyboard.press("Escape");
+
+// API
 await page.goto(BASE + "/scalar/", { waitUntil: "load" });
 await sleep(5000);
 await shot("web_api");

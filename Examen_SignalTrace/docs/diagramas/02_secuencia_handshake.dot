@@ -42,7 +42,7 @@ n10 [shape=note, style=filled, fillcolor="#FFF4E5", color="#9A6700", fontsize=10
 z = ECDH(privC, pubS) → mismas llaves"]; {rank=same; d10; n10; s10;} d10 -> n10 [style=invis]; n10 -> s10 [style=invis]; d10 -> n10 [style=dotted, arrowhead=none, constraint=false];
 d11 [shape=point, width=0.05, group=D]; s11 [shape=point, width=0.05, group=S]; {rank=same; d11; s11;}
 d10 -> d11 [arrowhead=none, style=dashed, color="#9AA7B6"]; s10 -> s11 [arrowhead=none, style=dashed, color="#9AA7B6"];
-d11 -> s11 [label="12. POST /api/telemetry {sid, did, seq, ts, ct = AEAD(SigMix(json))}", constraint=false, color="#0F6CBD"];
+d11 -> s11 [label="12. POST /api/telemetry {sid, did, seq, ts, ct = AEAD(Yael Crypto March1(json))}", constraint=false, color="#0F6CBD"];
 d12 [shape=point, width=0.05, group=D]; s12 [shape=point, width=0.05, group=S]; {rank=same; d12; s12;}
 d11 -> d12 [arrowhead=none, style=dashed, color="#9AA7B6"]; s11 -> s12 [arrowhead=none, style=dashed, color="#9AA7B6"];
 s12 -> d12 [label="13. 202 {ack: seq}  ·  409 replay  ·  422 auth_failed  ·  404 unknown_session", constraint=false, color="#0F6CBD"];

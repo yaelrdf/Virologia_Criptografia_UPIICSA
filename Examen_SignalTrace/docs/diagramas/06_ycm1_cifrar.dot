@@ -1,7 +1,7 @@
 digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
   rankdir=TB; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
   s [label="Entrada: texto claro P, k_sig, seq", shape=oval, fillcolor="#DCEAF7"];
-  h [label="h = SHA-256(k_sig || u64be(seq) || \"SigMix\")\nseed = h[0];  ronda i: k = h[1+3i], m = h[2+3i], rot = h[3+3i]"];
+  h [label="h = SHA-256(k_sig || u64be(seq) || \"Yael Crypto March1\")\nseed = h[0];  ronda i: k = h[1+3i], m = h[2+3i], rot = h[3+3i]"];
   pad [label="Relleno: n = 2 − (|P| mod 2); agregar n bytes de valor n"];
   init [label="s ← seed;  r ← 0"];
   st [label="1) Flujo LCG: para i = 0..n−1:\ns ← (5·s + 3) mod 256;  p[i] ← (p[i] + s) mod 256"];
