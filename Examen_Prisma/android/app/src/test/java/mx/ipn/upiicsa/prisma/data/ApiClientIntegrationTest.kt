@@ -1,3 +1,5 @@
+// Pruebas JVM de ApiClient contra un servidor ABCO real: flujo completo de la API, contraseña temporal
+// restablecida por el administrador y mensajes legibles ante errores de red.
 package mx.ipn.upiicsa.prisma.data
 
 import kotlinx.coroutines.runBlocking
@@ -17,15 +19,28 @@ import org.junit.Test
  * Ojo: las rutas /api/auth admiten 10 peticiones por minuto por IP; entre ambas pruebas se hacen 8.
  */
 class ApiClientIntegrationTest {
+    /** URL del servidor de pruebas (variable de entorno PRISMA_TEST_SERVER o localhost). */
     private val base = System.getenv("PRISMA_TEST_SERVER") ?: "http://localhost:5080"
+    /** Token que usa [api]; cada prueba lo cambia para actuar como distintos usuarios o simular uno inválido. */
     private var token: String? = null
+    /** Cliente bajo prueba; lee [base] y [token] en cada petición, igual que en la app. */
     private val api = ApiClient(baseUrl = { base }, token = { token })
 
+    /**
+     * true si `/api/health` responde "ok". Las pruebas que lo requieren se omiten (assumeTrue) en vez de fallar
+     * cuando no hay servidor.
+     */
     private fun serverUp(): Boolean = runCatching { runBlocking { api.health() }.status == "ok" }.getOrDefault(false)
 
+    /**
+     * Recorre la API como usuario normal: registro, login, token inválido, catálogo, ocultar y revelar
+     * (ABCO y esteganografía clásica, incluido el 422 con frase incorrecta), César, comparador, 403 en
+     * administración y el ciclo completo de 2FA con imagen-llave.
+     */
     @Test
     fun flujoCompleto(): Unit = runBlocking {
         assumeTrue("Servidor no disponible en $base", serverUp())
+        // Sufijo con la hora para no chocar con usuarios de ejecuciones anteriores.
         val user = "android_test_${System.currentTimeMillis() % 1_000_000}"
         val pass = "Prueba#2026x"
 
@@ -106,6 +121,7 @@ class ApiClientIntegrationTest {
     /**
      * Restablecer contraseña (admin) → login con mustChangePassword → ruta bloqueada (403)
      * → cambiar contraseña → el token nuevo funciona. También rol (409) y desofuscar.
+     * Requiere que la cuenta de administrador no tenga 2FA.
      */
     @Test
     fun restablecerContrasena(): Unit = runBlocking {
@@ -171,6 +187,10 @@ class ApiClientIntegrationTest {
         assertFalse(again.mustChangePassword)
     }
 
+    /**
+     * Sin servidor: un puerto cerrado en 127.0.0.1 debe producir [ApiException] con código 0 y un mensaje
+     * en español, no una excepción de red sin traducir. No necesita el servidor de ABCO.
+     */
     @Test
     fun errorDeRedLegible(): Unit = runBlocking {
         val offline = ApiClient(baseUrl = { "http://127.0.0.1:1" }, token = { null })

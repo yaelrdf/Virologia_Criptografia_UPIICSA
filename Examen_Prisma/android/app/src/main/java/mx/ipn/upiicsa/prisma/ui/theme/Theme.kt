@@ -1,3 +1,4 @@
+// Tema Material 3 de ABCO: esquemas de color claro y oscuro, y colores de estado adicionales.
 package mx.ipn.upiicsa.prisma.ui.theme
 
 import androidx.compose.material3.MaterialTheme
@@ -10,6 +11,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
+/** Esquema de color claro construido con la paleta de Color.kt. */
 private val LightColors = lightColorScheme(
     primary = GreenLight, onPrimary = Color.White,
     primaryContainer = GreenContainerLight, onPrimaryContainer = OnGreenContainerLight,
@@ -34,6 +36,10 @@ private val LightColors = lightColorScheme(
     outline = OutlineLight, outlineVariant = OutlineVariantLight,
 )
 
+/**
+ * Esquema de color oscuro. `surface` usa el mismo gris que el fondo para que las tarjetas se distingan
+ * por los niveles `surfaceContainer*` y no por un salto de color.
+ */
 private val DarkColors = darkColorScheme(
     primary = GreenDark, onPrimary = OnGreenDark,
     primaryContainer = GreenContainerDark, onPrimaryContainer = OnGreenContainerDark,
@@ -58,16 +64,32 @@ private val DarkColors = darkColorScheme(
     outline = OutlineDark, outlineVariant = OutlineVariantDark,
 )
 
-/** Colores de estado que Material 3 no define (p. ej. "sí" en el comparador). */
+/**
+ * Colores de estado que Material 3 no define (p. ej. "sí" en el comparador).
+ *
+ * @property success verde con contraste suficiente para el tema activo.
+ */
 @Immutable
 data class StatusColors(val success: Color)
 
+/** Colores de estado para el tema claro. */
 private val LightStatus = StatusColors(success = GreenLight)
+/** Colores de estado para el tema oscuro. */
 private val DarkStatus = StatusColors(success = GreenDark)
 
+/**
+ * CompositionLocal con los [StatusColors] del tema activo. Es `static` porque solo cambia al cambiar de
+ * tema, y entonces conviene recomponer todo el árbol.
+ */
 private val LocalStatusColors = staticCompositionLocalOf { LightStatus }
 
-/** [darkTheme] lo decide MainActivity según el modo elegido (automático, claro u oscuro). */
+/**
+ * Tema de ABCO (el nombre `PrismaTheme` se conserva de PRISMA-L): aplica el esquema de color, la
+ * tipografía y los [StatusColors] correspondientes.
+ *
+ * @param darkTheme lo decide MainActivity según el modo elegido (automático, claro u oscuro).
+ * @param content contenido Compose al que se aplica el tema.
+ */
 @Composable
 fun PrismaTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalStatusColors provides if (darkTheme) DarkStatus else LightStatus) {
@@ -79,7 +101,7 @@ fun PrismaTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-/** Verde de "sí" del tema activo. */
+/** Verde de "sí" del tema activo; se lee desde cualquier Composable sin pasarlo como parámetro. */
 val successColor: Color
     @Composable @ReadOnlyComposable
     get() = LocalStatusColors.current.success

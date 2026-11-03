@@ -1,3 +1,5 @@
+// Raíz de la interfaz de ABCO: decide entre login, cambio obligatorio de contraseña y la navegación
+// principal, y elige la navegación adaptativa (barra inferior o NavigationRail) según el ancho de ventana.
 package mx.ipn.upiicsa.prisma.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +65,10 @@ import mx.ipn.upiicsa.prisma.ui.screens.HideScreen
 import mx.ipn.upiicsa.prisma.ui.screens.LoginScreen
 import mx.ipn.upiicsa.prisma.ui.screens.RevealScreen
 
-/** Escudo (Material "Shield"); material-icons-core no lo incluye. */
+/**
+ * Escudo (Material "Shield"); material-icons-core no lo incluye. Se dibuja a mano para no agregar la
+ * dependencia de íconos extendidos (muy pesada) por un solo ícono. `lazy` lo construye una sola vez.
+ */
 val ShieldIcon: ImageVector by lazy {
     ImageVector.Builder("Escudo", 24.dp, 24.dp, 24f, 24f).apply {
         path(fill = SolidColor(Color.Black)) {
@@ -79,6 +84,12 @@ val ShieldIcon: ImageVector by lazy {
     }.build()
 }
 
+/**
+ * Destinos de la navegación principal.
+ *
+ * @property label texto de la barra o del rail.
+ * @property adminOnly solo se muestra a usuarios con rol `admin`.
+ */
 enum class Destination(val label: String, val icon: ImageVector, val adminOnly: Boolean = false) {
     HIDE("Ocultar", Icons.Filled.Lock),
     REVEAL("Revelar", Icons.Filled.Search),
@@ -91,14 +102,28 @@ enum class Destination(val label: String, val icon: ImageVector, val adminOnly: 
 /** Ancho de ventana desde el que se usa NavigationRail (y diseños de 2 columnas). */
 private val RailMinWidth: Dp = 600.dp
 
-/** Con menos altura, el rail muestra la etiqueta solo en el ítem seleccionado. */
+/**
+ * Con menos altura, el rail muestra la etiqueta solo en el ítem seleccionado (teléfono en horizontal),
+ * para que los 6 ítems quepan con menos desplazamiento.
+ */
 private val RailCompactHeight: Dp = 480.dp
 
+/**
+ * Raíz Compose de ABCO (el nombre `PrismaApp` se conserva de PRISMA-L).
+ *
+ * Lee [AppViewModel.session]: sin sesión muestra el login; con contraseña temporal
+ * (`mustChangePassword`) muestra la pantalla obligatoria de cambio antes de la navegación, así el usuario no
+ * llega a pantallas cuyas rutas el servidor respondería con 403; en otro caso, la navegación principal.
+ * También muestra en un Snackbar los avisos de [AppViewModel.notices] y publica [LocalWideLayout] para
+ * que los componentes sepan si la ventana es ancha.
+ */
 @Composable
 fun PrismaApp(vm: AppViewModel) {
     val snackbar = remember { SnackbarHostState() }
+    // Recoge los avisos mientras PrismaApp está en composición; la clave Unit evita reiniciar la recolección.
     LaunchedEffect(Unit) { vm.notices.collect { snackbar.showSnackbar(it) } }
 
+    // BoxWithConstraints mide la ventana real (incluye multiventana y plegables), no la pantalla física.
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= RailMinWidth
         val compactHeight = maxHeight < RailCompactHeight
@@ -132,9 +157,14 @@ fun PrismaApp(vm: AppViewModel) {
  *   verticalScroll, así en horizontal (≈ 330 dp útiles) nunca se enciman ni se pierde el último.
  *   Si la altura es < 480 dp, solo el ítem seleccionado lleva etiqueta (ítems más bajos).
  *   Sin encabezado ni botón de salir: cerrar sesión está en Cuenta.
+ *
+ * @param wide ancho de ventana ≥ 600 dp: NavigationRail en vez de barra inferior.
+ * @param compactHeight altura < 480 dp: etiquetas solo en el ítem seleccionado del rail.
+ * @param isAdmin muestra el destino Admin.
  */
 @Composable
 private fun MainShell(vm: AppViewModel, wide: Boolean, compactHeight: Boolean, isAdmin: Boolean) {
+    // rememberSaveable conserva el destino al rotar, que además cambia entre barra y rail.
     var current by rememberSaveable { mutableStateOf(Destination.HIDE) }
     val destinations = Destination.entries.filter { !it.adminOnly || isAdmin }
     // Si se pierde el rol de admin estando en esa pantalla, vuelve al inicio.
@@ -142,6 +172,7 @@ private fun MainShell(vm: AppViewModel, wide: Boolean, compactHeight: Boolean, i
 
     if (wide) {
         Row(Modifier.fillMaxSize()) {
+            // Sin insets propios: el Scaffold de PrismaApp ya aplicó los de las barras del sistema.
             NavigationRail(windowInsets = WindowInsets(0)) {
                 Column(
                     Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
@@ -162,6 +193,7 @@ private fun MainShell(vm: AppViewModel, wide: Boolean, compactHeight: Boolean, i
             Box(Modifier.weight(1f).fillMaxSize()) { DestinationContent(vm, shown) }
         }
     } else {
+        // Con 5 destinos o menos caben todas las etiquetas; con 6 (admin) solo la del seleccionado.
         val showAllLabels = destinations.size <= 5
         Scaffold(
             bottomBar = {
@@ -198,6 +230,7 @@ private fun NavLabel(text: String) {
     )
 }
 
+/** Muestra la pantalla del destino seleccionado. */
 @Composable
 private fun DestinationContent(vm: AppViewModel, destination: Destination) {
     when (destination) {

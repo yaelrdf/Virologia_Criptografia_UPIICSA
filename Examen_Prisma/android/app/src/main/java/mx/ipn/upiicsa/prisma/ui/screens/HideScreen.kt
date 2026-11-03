@@ -1,3 +1,5 @@
+// Pantalla Ocultar de ABCO: elegir portadora, escribir el mensaje, elegir modo (ABCO con frase o
+// esteganografía clásica) y obtener el PNG con el mensaje oculto para guardarlo o compartirlo.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +34,11 @@ import mx.ipn.upiicsa.prisma.ui.components.SectionCard
 import mx.ipn.upiicsa.prisma.ui.components.bringIntoViewOnFocus
 import java.util.Locale
 
+/**
+ * Pantalla Ocultar. Lee [AppViewModel.hide] (portadora, mensaje, modo, capacidad, resultado y error) y
+ * dispara [AppViewModel.selectCover] al elegir portadora y [AppViewModel.embed] al ocultar.
+ * En panel ancho, al haber resultado (o carga o error) pasa a formulario | resultado.
+ */
 @Composable
 fun HideScreen(vm: AppViewModel) {
     val s = vm.hide
@@ -58,6 +65,7 @@ fun HideScreen(vm: AppViewModel) {
                     label = { Text("Mensaje secreto") },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).bringIntoViewOnFocus(),
                 )
+                // La frase solo aplica a ABCO; la esteganografía clásica no usa clave.
                 if (s.mode == StegoMode.PRISMA) {
                     PasswordField(
                         value = s.passphrase, onValueChange = { s.passphrase = it },
@@ -81,6 +89,7 @@ fun HideScreen(vm: AppViewModel) {
                     InfoRow("PSNR", r.psnr?.let { formatPsnr(it) } ?: "—")
                     InfoRow("Bytes usados / capacidad", "${r.payloadBytes ?: "—"} / ${r.capacity ?: "—"}")
                     if (r.resized) InfoRow("Portadora", "reducida a ≤ 1280 px")
+                    // Nombre fijo por resultado (remember(r)) para que no cambie en cada recomposición.
                     val fileName = remember(r) { "abco_${System.currentTimeMillis() / 1000}.png" }
                     PngActions(vm, r.png, fileName)
                     Text(
@@ -96,10 +105,15 @@ fun HideScreen(vm: AppViewModel) {
     )
 }
 
+/**
+ * Bytes del mensaje (UTF-8) frente a la capacidad del modo elegido, con barra de uso. Es solo un aviso:
+ * el servidor valida de nuevo y responde 413 si no cabe.
+ */
 @Composable
 private fun CapacityInfo(vm: AppViewModel) {
     val s = vm.hide
     val cap = s.capacity
+    // Se cuentan bytes UTF-8, no caracteres: una letra con tilde o un emoji ocupan más de un byte.
     val used = remember(s.message) { s.message.encodeToByteArray().size }
     when {
         s.capacityLoading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,5 +139,6 @@ private fun CapacityInfo(vm: AppViewModel) {
     }
 }
 
+/** PSNR con 2 decimales; infinito significa que la imagen no cambió (mensaje vacío o idéntico). */
 private fun formatPsnr(v: Double): String =
     if (v.isInfinite()) "∞ dB (sin cambios)" else String.format(Locale.US, "%.2f dB", v)

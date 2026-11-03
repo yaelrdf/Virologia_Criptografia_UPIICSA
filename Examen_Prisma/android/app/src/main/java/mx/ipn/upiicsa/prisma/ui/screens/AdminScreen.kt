@@ -1,3 +1,5 @@
+// Pantalla de administración de ABCO (solo rol admin): usuarios con nombre ofuscado y acciones con
+// confirmación, auditoría en hora local, traza de la última operación ABCO y su mapa de diferencias.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import android.content.ClipData
@@ -73,27 +75,40 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Acción pendiente de confirmar sobre un usuario. */
+/**
+ * Acción pendiente de confirmar sobre un usuario. Ninguna acción administrativa se ejecuta con un solo
+ * toque: primero se guarda aquí y se muestra [ConfirmDialog].
+ */
 private sealed interface PendingAction {
     val user: AdminUser
+    /** Generar una contraseña temporal (desactiva el 2FA y obliga a cambiarla). */
     data class ResetPassword(override val user: AdminUser) : PendingAction
+    /** Hacer administrador ([makeAdmin] = true) o quitar el rol. */
     data class ChangeRole(override val user: AdminUser, val makeAdmin: Boolean) : PendingAction
+    /** Quitar el doble factor del usuario. */
     data class Reset2fa(override val user: AdminUser) : PendingAction
 }
 
 /**
  * Administración (rol admin): usuarios, auditoría y traza de la última operación ABCO.
  * En pantallas anchas, usuarios a la izquierda y auditoría + traza a la derecha (AdaptivePane).
+ *
+ * Lee [AppViewModel.admin]; la primera vez carga todo con [AppViewModel.refreshAdmin] y después solo con
+ * el botón «Actualizar». Las acciones sobre usuarios pasan por un diálogo de confirmación, y la contraseña
+ * temporal generada se muestra en su propio diálogo.
  */
 @Composable
 fun AdminScreen(vm: AppViewModel) {
     val s = vm.admin
+    // Solo carga la primera vez; volver a esta pestaña no repite las cuatro peticiones.
     LaunchedEffect(Unit) { if (!s.loaded) vm.refreshAdmin() }
+    // `remember` (no rememberSaveable): PendingAction no es guardable; al rotar se cierra la confirmación.
     var pending by remember { mutableStateOf<PendingAction?>(null) }
 
     AdaptivePane(
         title = "Administración",
         subtitle = "Usuarios, auditoría y traza de la última operación ABCO.",
+        // Siempre en formulario | resultado: usuarios a la izquierda, auditoría y traza a la derecha.
         hasResult = true,
         headerActions = {
             FilledTonalButton(onClick = vm::refreshAdmin, enabled = !s.loading) {
@@ -143,6 +158,13 @@ fun AdminScreen(vm: AppViewModel) {
     }
 }
 
+/**
+ * Tarjeta de un usuario: nombre (ofuscado o revelado), rol, 2FA, contraseña temporal pendiente, fecha de
+ * alta y botones de acción. FlowRow pasa los chips y botones a otra línea cuando no caben.
+ *
+ * @param busy hay una acción en curso para este usuario: se deshabilitan sus botones.
+ * @param onAction pide confirmar la acción elegida.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UserCard(
@@ -160,6 +182,7 @@ private fun UserCard(
                     Text(
                         revealed ?: user.username,
                         style = MaterialTheme.typography.titleMedium,
+                        // Monoespaciada mientras está ofuscado, para que se note que no es el nombre real.
                         fontFamily = if (revealed == null) FontFamily.Monospace else null,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -201,6 +224,12 @@ private fun UserCard(
     }
 }
 
+/**
+ * Chip informativo del estado de un usuario.
+ *
+ * @param highlighted usa el verde de "sí" (p. ej. administrador o 2FA activado).
+ * @param warning usa el color de advertencia con ícono (contraseña temporal pendiente).
+ */
 @Composable
 private fun StatusChip(text: String, highlighted: Boolean = false, warning: Boolean = false) {
     val color = when {
@@ -209,6 +238,7 @@ private fun StatusChip(text: String, highlighted: Boolean = false, warning: Bool
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     AssistChip(
+        // Solo informativo: no hace nada al tocarlo.
         onClick = {},
         label = { Text(text) },
         leadingIcon = if (warning) {
@@ -218,6 +248,11 @@ private fun StatusChip(text: String, highlighted: Boolean = false, warning: Bool
     )
 }
 
+/**
+ * Diálogo de confirmación con título, explicación y botón según la acción.
+ *
+ * @param name nombre visible del usuario (el real si ya se reveló).
+ */
 @Composable
 private fun ConfirmDialog(action: PendingAction, name: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val (title, body, confirm) = when (action) {
@@ -252,6 +287,10 @@ private fun ConfirmDialog(action: PendingAction, name: String, onConfirm: () -> 
     )
 }
 
+/**
+ * Muestra la contraseña temporal recién generada en letra grande y monoespaciada, con botón «Copiar».
+ * Es la única vez que se puede ver: al cerrar, [AppViewModel.dismissTemporaryPassword] la olvida.
+ */
 @Composable
 private fun TemporaryPasswordDialog(name: String, password: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -295,15 +334,25 @@ private fun TemporaryPasswordDialog(name: String, password: String, onDismiss: (
     )
 }
 
-/** Copia marcando el contenido como sensible (Android 13+ no lo muestra en la vista previa). */
+/**
+ * Copia marcando el contenido como sensible (Android 13+ no lo muestra en la vista previa).
+ * Sin la marca, la contraseña temporal aparecería en el aviso flotante que el sistema muestra al copiar
+ * y podría verla alguien que mire la pantalla.
+ */
 private fun copyToClipboard(context: Context, text: String) {
     val clip = ClipData.newPlainText("Contraseña temporal", text)
+    // EXTRA_IS_SENSITIVE existe desde Android 13 (API 33); en versiones anteriores se copia sin la marca.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
     }
     context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
 }
 
+/**
+ * Auditoría de las últimas operaciones.
+ *
+ * @param loading muestra la barra de progreso mientras se hace la primera carga.
+ */
 @Composable
 private fun AuditCard(entries: List<AuditEntry>, loading: Boolean) {
     SectionCard("Auditoría (últimas ${entries.size})") {
@@ -318,6 +367,7 @@ private fun AuditCard(entries: List<AuditEntry>, loading: Boolean) {
     }
 }
 
+/** Una entrada de auditoría: acción, resultado, fecha local, usuario ofuscado y detalles (modo, bytes, ms). */
 @Composable
 private fun AuditRow(e: AuditEntry) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -348,8 +398,13 @@ private fun AuditRow(e: AuditEntry) {
     }
 }
 
+/** Texto visible del modo a partir del valor del servidor ("prisma" = ABCO, "clasico"); si no se reconoce, el valor tal cual. */
 private fun modeLabel(mode: String) = StegoMode.entries.firstOrNull { it.apiValue == mode }?.label ?: mode
 
+/**
+ * Traza paso a paso de la última operación ABCO y mapa de diferencias |original − estego| amplificado.
+ * Lee `trace` y `diffMap` de [AppViewModel.admin].
+ */
 @Composable
 private fun TraceCard(vm: AppViewModel) {
     val s = vm.admin
@@ -374,6 +429,7 @@ private fun TraceCard(vm: AppViewModel) {
                         Text(
                             trace.text,
                             style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                            // Sin ajuste de línea y con scroll horizontal, para que las columnas de la traza no se rompan.
                             softWrap = false,
                             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(12.dp),
                         )
@@ -387,6 +443,7 @@ private fun TraceCard(vm: AppViewModel) {
                 bitmap = map,
                 contentDescription = "Mapa de diferencias",
                 contentScale = ContentScale.Fit,
+                // Sin filtrado al escalar: cada píxel del mapa se ve nítido en vez de difuminado.
                 filterQuality = FilterQuality.None,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(RoundedCornerShape(8.dp)),
             )
@@ -394,9 +451,13 @@ private fun TraceCard(vm: AppViewModel) {
     }
 }
 
+/** Formato de fecha y hora local en español de México (día/mes/año, 24 h). */
 private val localFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss", Locale.forLanguageTag("es-MX"))
 
-/** Convierte una fecha UTC del servidor (con o sin «Z») a la hora local del teléfono. */
+/**
+ * Convierte una fecha UTC del servidor (con o sin «Z») a la hora local del teléfono.
+ * Si no se puede interpretar, devuelve los primeros 19 caracteres con espacio en vez de «T».
+ */
 fun formatLocalDateTime(utc: String): String = runCatching {
     val instant = runCatching { OffsetDateTime.parse(utc).toInstant() }
         .getOrElse { LocalDateTime.parse(utc).toInstant(ZoneOffset.UTC) }

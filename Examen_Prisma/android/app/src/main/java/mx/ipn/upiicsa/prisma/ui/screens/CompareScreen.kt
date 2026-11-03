@@ -1,3 +1,5 @@
+// Pantalla Comparador de ABCO: aplica César, esteganografía clásica y ABCO al mismo mensaje y muestra
+// tamaño, tiempo, entropía, salida en hex y si cada algoritmo detecta alteraciones.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +34,10 @@ import mx.ipn.upiicsa.prisma.ui.theme.MonoStyle
 import mx.ipn.upiicsa.prisma.ui.theme.successColor
 import java.util.Locale
 
+/**
+ * Pantalla Comparador. Lee y edita [AppViewModel.compare] (mensaje, frase, clave César y resultado) y
+ * dispara [AppViewModel.runCompare]. Cada algoritmo del resultado se muestra en su propia tarjeta.
+ */
 @Composable
 fun CompareScreen(vm: AppViewModel) {
     val s = vm.compare
@@ -55,6 +61,7 @@ fun CompareScreen(vm: AppViewModel) {
                     value = s.caesarKey.toFloat(),
                     onValueChange = { s.caesarKey = it.toInt() },
                     valueRange = 0f..25f,
+                    // Clave César fija de 0 a 25 (alfabeto sin Ñ); un paso por cada valor entero intermedio.
                     steps = 24,
                 )
                 LoadingButton("Comparar", s.loading, onClick = vm::runCompare, modifier = Modifier.fillMaxWidth())
@@ -74,6 +81,11 @@ fun CompareScreen(vm: AppViewModel) {
     )
 }
 
+/**
+ * Tarjeta con las métricas de un algoritmo del comparador.
+ *
+ * @param r resultado de un algoritmo (César, esteganografía clásica o ABCO).
+ */
 @Composable
 private fun AlgorithmCard(r: CompareResult) {
     SectionCard {
@@ -84,6 +96,7 @@ private fun AlgorithmCard(r: CompareResult) {
             }
             val ok = r.detectsTampering
             AssistChip(
+                // Chip informativo: no hace nada al tocarlo; solo muestra el sí/no con color.
                 onClick = {},
                 label = { Text(if (ok) "Detecta alteración" else "No detecta alteración") },
                 colors = AssistChipDefaults.assistChipColors(
@@ -102,7 +115,10 @@ private fun AlgorithmCard(r: CompareResult) {
     }
 }
 
-/** Entropía de Shannon en bits por byte (0 a 8). */
+/**
+ * Entropía de Shannon en bits por byte (0 a 8), con barra proporcional. Cerca de 8 = la salida parece
+ * aleatoria; un texto plano suele quedar alrededor de 4.
+ */
 @Composable
 private fun EntropyBar(entropy: Double) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

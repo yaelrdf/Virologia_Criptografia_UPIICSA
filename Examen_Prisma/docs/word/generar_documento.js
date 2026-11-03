@@ -1,17 +1,29 @@
-// Genera la documentación del sistema ABCO en Word.
-// Uso (desde Examen_Prisma):  NODE_PATH=<carpeta con node_modules/docx> node docs/word/generar_documento.js <salida.docx>
+/**
+ * Genera la documentación técnica del sistema ABCO en Word (.docx) con la librería docx.
+ *
+ * El contenido (portada, índice y los capítulos 1 a 16) se escribe aquí con los constructores de
+ * lib.js; los diagramas, las capturas, las métricas medidas (docs/metricas.md) y la traza de ejemplo
+ * se leen de la carpeta docs. Los nombres "Prisma" de rutas y proyectos son los nombres internos de ABCO.
+ *
+ * Uso (desde Examen_Prisma):  NODE_PATH=<carpeta con node_modules/docx> node docs/word/generar_documento.js <salida.docx>
+ */
 const fs = require("fs");
 const path = require("path");
 const L = require("./lib");
 const { D, P, H1, H1keep, H2, H3, bullets, steps, code, tbl, img, markdown, pageBreak, runs } = L;
 const { Document, Packer, Paragraph, TextRun, AlignmentType, TableOfContents, Header, Footer, PageNumber, HeadingLevel, BorderStyle } = D;
 
+/** Raíz del proyecto (Examen_Prisma). */
 const ROOT = path.resolve(__dirname, "..", "..");
+/** Rutas de un diagrama exportado a PNG (por nombre, sin extensión) y de una captura de pantalla. */
 const DIAG = (n) => path.join(ROOT, "docs", "diagramas", "png", n + ".png");
 const SHOT = (n) => path.join(ROOT, "docs", "capturas", n);
+/** Archivo de salida: primer argumento o, por defecto, Documentacion_Sistema_ABCO.docx en la raíz. */
 const out = process.argv[2] || path.join(ROOT, "Documentacion_Sistema_ABCO.docx");
+/** Métricas medidas por tools/Prisma.Metrics y traza de ejemplo de una operación ABCO. */
 const metricas = fs.readFileSync(path.join(ROOT, "docs", "metricas.md"), "utf8");
 const traza = fs.readFileSync(path.join(ROOT, "docs", "traza_ejemplo.txt"), "utf8");
+/** Capturas de la app Android (archivos android_*), en orden, y el pie de figura de cada una. */
 const androidShots = fs.existsSync(path.join(ROOT, "docs", "capturas"))
   ? fs.readdirSync(path.join(ROOT, "docs", "capturas")).filter((f) => f.startsWith("android_")).sort() : [];
 const androidCaptions = {
@@ -26,10 +38,17 @@ const androidCaptions = {
   "android_09_cuenta_oscuro.jpg": "App Android: Cuenta en tema oscuro, con selector de tema y cambio de contraseña.",
 };
 
+/** Elementos del cuerpo del documento, en orden. `add` acepta elementos sueltos o arreglos y los aplana. */
 const body = [];
 const add = (...xs) => xs.flat().forEach((x) => body.push(x));
 
 // ───────────────────────── Portada ─────────────────────────
+/**
+ * Renglón centrado de la portada.
+ * @param {string} t Texto.
+ * @param {number} size Tamaño en medios puntos.
+ * @param {{after?: number, bold?: boolean, color?: string}} [opts] Espacio posterior (DXA), negrita y color.
+ */
 const center = (t, size, opts = {}) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: opts.after ?? 120 }, children: [new TextRun({ text: t, size, bold: opts.bold, color: opts.color })] });
 add(
   new Paragraph({ spacing: { before: 700 }, children: [] }),
@@ -478,6 +497,18 @@ add(
 );
 
 // ───────────────────────── 9. Escenarios ─────────────────────────
+/**
+ * Escenario de uso: subtítulo, tabla con actores, precondiciones, resultado esperado y evidencia, y
+ * la lista numerada de pasos.
+ * @param {string} id Identificador (E1, E2…).
+ * @param {string} title Título del escenario.
+ * @param {string} actors Actores.
+ * @param {string} pre Precondiciones.
+ * @param {string[]} stepsList Pasos.
+ * @param {string} expected Resultado esperado.
+ * @param {string} evidence Evidencia.
+ * @returns {Array} Elementos para `add`.
+ */
 const scenario = (id, title, actors, pre, stepsList, expected, evidence) => [
   H2(`${id}. ${title}`),
   ...tbl(["Elemento", "Descripción"], [
@@ -687,6 +718,9 @@ add(
 );
 
 // ───────────────────────── Documento ─────────────────────────
+// Se crea al final porque `numberingConfigs` ya debe tener las listas numeradas que agregó steps().
+// Página carta con márgenes de 1 in; la portada no lleva encabezado ni pie (titlePage); el campo
+// del índice se actualiza al abrir el documento (updateFields).
 const doc = new Document({
   creator: "Equipo ABCO",
   title: "Documentación del sistema ABCO",
@@ -721,4 +755,5 @@ const doc = new Document({
   }],
 });
 
+// Empaqueta el .docx y lo escribe en disco.
 Packer.toBuffer(doc).then((buf) => { fs.writeFileSync(out, buf); console.log("→", out, `(${(buf.length / 1024).toFixed(0)} KB)`); });

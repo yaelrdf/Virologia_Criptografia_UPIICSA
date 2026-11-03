@@ -1,3 +1,5 @@
+// Pantalla César de ABCO: cifrar, descifrar y romper por análisis de frecuencias (χ²), con alfabeto
+// de 26 letras o de 27 con Ñ. El cálculo lo hace el servidor.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +36,11 @@ import mx.ipn.upiicsa.prisma.ui.components.bringIntoViewOnFocus
 import mx.ipn.upiicsa.prisma.ui.theme.MonoStyle
 import java.util.Locale
 
+/**
+ * Pantalla César. Lee y edita [AppViewModel.caesar] (texto, clave, Ñ, resultado o candidatos) y dispara
+ * [AppViewModel.caesarRun] con la acción de cada botón. Los tres botones se deshabilitan mientras hay una
+ * petición en curso.
+ */
 @Composable
 fun CaesarScreen(vm: AppViewModel) {
     val s = vm.caesar
@@ -59,6 +66,7 @@ fun CaesarScreen(vm: AppViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // Al quitar la Ñ la clave máxima baja de 26 a 25: se ajusta la clave actual.
                     Switch(checked = s.enye, onCheckedChange = {
                         s.enye = it
                         s.key = s.key.coerceIn(0, s.maxKey)
@@ -69,6 +77,7 @@ fun CaesarScreen(vm: AppViewModel) {
                     value = s.key.toFloat(),
                     onValueChange = { s.key = it.toInt().coerceIn(0, s.maxKey) },
                     valueRange = 0f..s.maxKey.toFloat(),
+                    // Un paso por cada valor entero intermedio, para que el control salte de clave en clave.
                     steps = s.maxKey - 1,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -89,6 +98,7 @@ fun CaesarScreen(vm: AppViewModel) {
                     if (s.alphabet.isNotEmpty()) {
                         Text("Alfabeto: ${s.alphabet}", style = MonoStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    // Pasa el resultado al campo de entrada, p. ej. para descifrar lo que se acaba de cifrar.
                     TextButton(onClick = { s.text = out; s.output = null }) { Text("Usar como texto de entrada") }
                 }
             }
@@ -111,6 +121,7 @@ fun CaesarScreen(vm: AppViewModel) {
     )
 }
 
+/** Tabla de candidatos de romper César: clave, χ² y vista previa del texto descifrado. */
 @Composable
 private fun CandidateTable(rows: List<mx.ipn.upiicsa.prisma.data.CrackCandidate>) {
     Column {
@@ -132,10 +143,12 @@ private fun CandidateTable(rows: List<mx.ipn.upiicsa.prisma.data.CrackCandidate>
     }
 }
 
+/** Encabezado de columna de [CandidateTable]. */
 @Composable
 private fun Header(text: String, modifier: Modifier) {
     Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier)
 }
 
+/** Número con 2 decimales y punto decimal (Locale.US), independiente del idioma del teléfono. */
 private fun fmt(v: Double) = String.format(Locale.US, "%.2f", v)

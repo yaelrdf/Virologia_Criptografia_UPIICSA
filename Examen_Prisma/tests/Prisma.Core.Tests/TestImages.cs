@@ -1,10 +1,17 @@
+// TestImages.cs — Imágenes sintéticas deterministas para las pruebas de esteganografía.
+// Se generan en memoria para no depender de archivos ni del catálogo de la API.
 using Prisma.Core;
 
 namespace Prisma.Core.Tests;
 
+/// <summary>Fábrica de portadoras de prueba.</summary>
 internal static class TestImages
 {
     /// <summary>Imagen sintética "natural": degradado suave con poco ruido.</summary>
+    /// <param name="w">Ancho en píxeles.</param>
+    /// <param name="h">Alto en píxeles.</param>
+    /// <param name="seed">Semilla del ruido (±3 por canal), para que la imagen sea reproducible.</param>
+    /// <returns>Degradado horizontal en R, vertical en G y diagonal en B.</returns>
     public static RgbImage Gradient(int w = 256, int h = 192, int seed = 7)
     {
         var rng = new Random(seed);
@@ -20,6 +27,12 @@ internal static class TestImages
     }
 
     /// <summary>Imagen con todos los canales pares: histograma muy desbalanceado en los pares (2k, 2k+1).</summary>
+    /// <param name="w">Ancho en píxeles.</param>
+    /// <param name="h">Alto en píxeles.</param>
+    /// <returns>
+    /// Imagen cuyos canales valen 2·((x + y) mod 128): cada valor impar tiene frecuencia 0. Es un caso extremo
+    /// de imagen limpia para el ataque χ², y al llenarla con esteganografía clásica el contraste es máximo.
+    /// </returns>
     public static RgbImage EvenOnly(int w = 256, int h = 256)
     {
         var ch = new byte[w * h * 3];

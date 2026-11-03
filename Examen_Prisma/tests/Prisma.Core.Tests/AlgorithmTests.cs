@@ -1,11 +1,20 @@
+// AlgorithmTests.cs — Pruebas xUnit de los algoritmos de Prisma.Core (el núcleo de ABCO).
+// Cubren las propiedades matemáticas (inversa modular, |GL₂|, periodo del César dinámico,
+// permutación del recorrido, gamma incompleta), la capa de cifrado de ABCO, César y su ataque χ²,
+// y la esteganografía (ABCO y clásica), incluido el estegoanálisis.
 using System.Security.Cryptography;
 using System.Text;
 using Prisma.Core;
 
 namespace Prisma.Core.Tests;
 
+/// <summary>Propiedades matemáticas en las que se apoya ABCO.</summary>
 public class MathTests
 {
+    /// <summary>
+    /// Para 2000 matrices aleatorias con det impar, A·A⁻¹ = I (columna a columna); las de det par deben
+    /// rechazarse con <see cref="ArgumentException"/>.
+    /// </summary>
     [Fact]
     public void InverseTimesMatrixIsIdentity_ForRandomOddDeterminants()
     {
@@ -22,15 +31,24 @@ public class MathTests
         }
     }
 
+    /// <summary>
+    /// Cuenta por fuerza bruta las matrices invertibles sobre Z_16 (k = 4) y comprueba la fórmula que la
+    /// documentación usa para el espacio de claves de Hill en Z_256.
+    /// </summary>
     [Fact]
     public void GL2CountOverZ16_MatchesFormula()
     {
         int count = 0;
         for (int a = 0; a < 16; a++) for (int b = 0; b < 16; b++) for (int c = 0; c < 16; c++) for (int d = 0; d < 16; d++)
             if (((a * d - b * c) & 1) != 0) count++;
-        Assert.Equal((1 << 12) * 6, count);   // |GL₂(ℤ_{2^k})| = 2^{4(k−1)}·6 → con k = 8: 2²⁸·6
+        Assert.Equal((1 << 12) * 6, count);   // |GL₂(ℤ_{2^k})| = 2^{4(k−1)}·6; aquí k = 4 → 2¹²·6; con k = 8: 2²⁸·6
     }
 
+    /// <summary>
+    /// Los parámetros derivados cumplen Hull–Dobell (a ≡ 1 mod 4, a ≠ 1, c impar) y, en efecto, la secuencia
+    /// de desplazamientos recorre los 256 valores antes de repetirse.
+    /// </summary>
+    /// <param name="pass">Frase de prueba.</param>
     [Theory]
     [InlineData("uno")]
     [InlineData("dos")]
@@ -44,6 +62,7 @@ public class MathTests
         Assert.Equal(256, seen.Count);
     }
 
+    /// <summary>El recorrido es una permutación de los canales 128..total−1: sin repetidos y sin tocar la zona de la sal.</summary>
     [Fact]
     public void PathIsAPermutation()
     {
@@ -53,6 +72,7 @@ public class MathTests
         Assert.All(p, x => Assert.InRange(x, 128, 99_999));
     }
 
+    /// <summary>La gamma incompleta y ln Γ coinciden con formas cerradas conocidas (ambas ramas de P(a, x)).</summary>
     [Fact]
     public void IncompleteGamma_MatchesClosedForms()
     {
@@ -62,8 +82,10 @@ public class MathTests
     }
 }
 
+/// <summary>Pruebas de la capa de cifrado de ABCO (<see cref="PrismaCipher"/>).</summary>
 public class CipherTests
 {
+    /// <summary>Descifrar lo cifrado devuelve el mensaje (recortando el relleno) para 500 mensajes aleatorios de longitud par e impar.</summary>
     [Fact]
     public void RoundTrip_RandomMessages()
     {
@@ -76,6 +98,7 @@ public class CipherTests
         }
     }
 
+    /// <summary>Gracias al encadenamiento y al César dinámico, 8 bloques claros idénticos ("AA") dan 8 bloques cifrados distintos.</summary>
     [Fact]
     public void EqualBlocksProduceDifferentCiphertext()
     {
@@ -84,6 +107,7 @@ public class CipherTests
         Assert.Equal(8, Enumerable.Range(0, 8).Select(i => Convert.ToHexString(c, 2 * i, 2)).Distinct().Count());
     }
 
+    /// <summary>César solo renombra símbolos (misma entropía que el claro); ABCO aplana el histograma (entropía &gt; 7.5 bits/byte).</summary>
     [Fact]
     public void Entropy_CaesarKeepsHistogram_PrismaFlattensIt()
     {
@@ -97,14 +121,19 @@ public class CipherTests
     }
 }
 
+/// <summary>Pruebas del cifrado César, su normalización, la ofuscación y el ataque χ².</summary>
 public class CaesarTests
 {
+    /// <summary>Ejemplo clásico del curso con k = 3.</summary>
     [Fact]
     public void MaterialExample_CRIPTOGRAFIA() => Assert.Equal("FULSWRJUDILD", Caesar.Encrypt("CRIPTOGRAFIA", 3));
 
+    /// <summary>Ejemplo de la guía con k = 3.</summary>
     [Fact]
     public void GuideExample_HOLA() => Assert.Equal("KROD", Caesar.Encrypt("HOLA", 3));
 
+    /// <summary>Ida y vuelta con ambos alfabetos: se conservan mayúsculas, dígitos y signos (el resultado es el texto normalizado).</summary>
+    /// <param name="enye">Usar el alfabeto con Ñ.</param>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -114,6 +143,7 @@ public class CaesarTests
         Assert.Equal(Caesar.Normalize(t, enye), Caesar.Decrypt(Caesar.Encrypt(t, 11, enye), 11, enye));
     }
 
+    /// <summary>Las vocales con tilde no pasan sin cifrar al resultado (delatarían el texto claro); la Ñ depende del alfabeto.</summary>
     [Fact]
     public void AccentsDoNotLeak()
     {
@@ -123,6 +153,9 @@ public class CaesarTests
         Assert.DoesNotContain('ó', Caesar.Encrypt("Información", 3));
     }
 
+    /// <summary>El ataque χ² recupera la clave correcta como primer candidato con un texto de unas 100 letras.</summary>
+    /// <param name="key">Clave usada para cifrar.</param>
+    /// <param name="enye">Usar el alfabeto con Ñ.</param>
     [Theory]
     [InlineData(11, false)]
     [InlineData(3, false)]
@@ -134,14 +167,21 @@ public class CaesarTests
         Assert.Equal(key, best.Key);
     }
 
+    /// <summary>La ofuscación de la consola admin es reversible sobre todo el ASCII imprimible.</summary>
     [Fact]
     public void ObfuscationRoundTrip() => Assert.Equal("usuario_01@prisma", Caesar.Deobfuscate(Caesar.Obfuscate("usuario_01@prisma")));
 }
 
+/// <summary>Pruebas de la esteganografía de ABCO, la clásica y el estegoanálisis χ².</summary>
 public class StegoTests
 {
+    /// <summary>Mensaje con tildes, signos y un emoji (UTF-8 de varios bytes).</summary>
     private const string Msg = "Reunión a las 18:00 en la biblioteca. ¡No faltes! 🦄";
 
+    /// <summary>
+    /// Ocultar, codificar a PNG, decodificar y revelar devuelve el mensaje: el PNG conserva los canales
+    /// exactos. La traza registra PSNR &gt; 60 dB y las primeras 20 posiciones del recorrido.
+    /// </summary>
     [Fact]
     public void Prisma_RoundTripThroughPng()
     {
@@ -155,12 +195,14 @@ public class StegoTests
         Assert.Equal(20, trace.FirstPositions.Count);
     }
 
+    /// <summary>Una frase incorrecta y un solo bit alterado dentro de la trama producen el mismo error genérico.</summary>
     [Fact]
     public void Prisma_WrongPassphraseOrTamperingGivesGenericError()
     {
         var stego = PrismaStego.Embed(TestImages.Gradient(), Encoding.UTF8.GetBytes(Msg), "frase-secreta");
         Assert.Throws<StegoException>(() => PrismaStego.Reveal(stego, "otra-frase"));
 
+        // Se reconstruye el recorrido con la frase correcta para alterar un canal que sí pertenece a la trama.
         var salt = PrismaStego.ReadBits(stego.Channels, i => i, PrismaStego.SaltBytes);
         var path = FisherYates.Path(stego.Channels.Length, PrismaKeys.Derive("frase-secreta", salt).Seed);
         var tampered = stego.Clone();
@@ -168,6 +210,7 @@ public class StegoTests
         Assert.Throws<StegoException>(() => PrismaStego.Reveal(tampered, "frase-secreta"));
     }
 
+    /// <summary>Un mensaje exactamente del tamaño de la capacidad cabe; uno de un byte más se rechaza.</summary>
     [Fact]
     public void Prisma_CapacityIsEnforced()
     {
@@ -177,6 +220,10 @@ public class StegoTests
         Assert.Throws<InvalidOperationException>(() => PrismaStego.Embed(small, new byte[cap + 1], "x"));
     }
 
+    /// <summary>
+    /// La esteganografía clásica la lee cualquiera; en una imagen ABCO, la lectura secuencial del bit
+    /// menos significativo no deja ver el texto.
+    /// </summary>
     [Fact]
     public void Classic_IsReadableByAnyone_PrismaIsNot()
     {
@@ -189,6 +236,10 @@ public class StegoTests
         Assert.DoesNotContain("Reuni", Encoding.UTF8.GetString(raw));
     }
 
+    /// <summary>
+    /// El ataque χ² da probabilidad casi nula en una imagen limpia con pares muy desbalanceados y casi
+    /// total cuando la esteganografía clásica la llena por completo.
+    /// </summary>
     [Fact]
     public void ChiSquareAttack_DetectsFullSequentialEmbedding()
     {
@@ -199,6 +250,7 @@ public class StegoTests
         Assert.True(Steganalysis.ChiSquareAttack(full).EmbeddingProbability > 0.9);
     }
 
+    /// <summary>FitWithin reduce conservando la proporción y devuelve la misma instancia si no hace falta reducir.</summary>
     [Fact]
     public void FitWithinResizesLargeCovers()
     {

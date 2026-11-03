@@ -66,7 +66,20 @@ keyAlias=prisma
 keyPassword=...
 ```
 
-Sin ese archivo el APK release sale sin firmar. Verificación:
+La llave **no se distribuye** con el código. Para crear una propia (una sola vez; guárdala y respáldala, porque
+sin ella no podrás publicar actualizaciones que se instalen encima de tu APK):
+
+```bash
+mkdir -p keystore
+keytool -genkeypair -v -keystore keystore/prisma-release.jks -alias prisma -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ABCO, OU=UPIICSA, O=IPN, C=MX"
+```
+
+Después crea `keystore.properties` con las rutas y contraseñas que elegiste (ambos archivos están en `.gitignore`).
+Si prefieres no firmar en release, `./gradlew :app:assembleDebug` genera un APK de depuración ya firmado con la llave de depuración de Android.
+
+Un APK firmado con otra llave **no se instala encima** de uno firmado con la llave anterior: hay que desinstalar la app primero.
+
+Sin `keystore.properties` el APK release sale sin firmar. Verificación:
 `$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs dist/Prisma-L.apk`.
 
 ### Prueba de integración

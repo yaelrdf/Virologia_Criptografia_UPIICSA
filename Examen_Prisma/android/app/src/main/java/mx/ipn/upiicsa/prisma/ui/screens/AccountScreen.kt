@@ -1,3 +1,5 @@
+// Pantalla Cuenta de ABCO (perfil, tema, cambio de contraseña y doble factor con imagen-llave) y pantalla
+// obligatoria «Cambia tu contraseña» para cuentas con contraseña temporal.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.compose.foundation.Image
@@ -48,12 +50,21 @@ import mx.ipn.upiicsa.prisma.ui.components.ThemeModeSelector
 import mx.ipn.upiicsa.prisma.ui.components.WarningCard
 import mx.ipn.upiicsa.prisma.ui.theme.successColor
 
+/**
+ * Pantalla Cuenta. Lee [AppViewModel.account] y la sesión; muestra el perfil, el selector de tema, el
+ * formulario de cambio de contraseña y la tarjeta para activar o desactivar el 2FA según su estado.
+ * Al generar una imagen-llave, esta aparece como resultado para guardarla o compartirla.
+ * Dispara [AppViewModel.refreshAccount] al entrar, además de logout, changePassword, enable2fa y disable2fa.
+ */
 @Composable
 fun AccountScreen(vm: AppViewModel) {
     val s = vm.account
+    // Sin sesión no hay nada que mostrar (PrismaApp ya estaría mostrando el login).
     val session = vm.session ?: return
+    // Recarga el perfil cada vez que se entra a Cuenta, por si el administrador cambió algo.
     LaunchedEffect(Unit) { vm.refreshAccount() }
     val info = s.info
+    // Mientras llega el perfil se usa el dato de la sesión, para no mostrar un estado vacío.
     val twoFactor = info?.twoFactorEnabled ?: session.twoFactorEnabled
 
     AdaptivePane(
@@ -90,6 +101,7 @@ fun AccountScreen(vm: AppViewModel) {
                     )
                 }
             }
+            // Solo se ofrece la acción que corresponde al estado actual del 2FA.
             if (!twoFactor) {
                 SectionCard("Activar 2FA") {
                     Text(
@@ -116,6 +128,7 @@ fun AccountScreen(vm: AppViewModel) {
             }
         },
         result = {
+            // La imagen-llave recién generada solo existe en memoria hasta que el usuario la guarde.
             val png = s.keyPng
             if (png != null) {
                 SectionCard("Tu imagen-llave") {
@@ -131,7 +144,13 @@ fun AccountScreen(vm: AppViewModel) {
     )
 }
 
-/** Campos actual / nueva / confirmar y botón; lo usan Cuenta y la pantalla obligatoria. */
+/**
+ * Campos actual / nueva / confirmar y botón; lo usan Cuenta y la pantalla obligatoria.
+ *
+ * @param s formulario a editar (el de Cuenta o el de la pantalla obligatoria).
+ * @param currentLabel etiqueta del primer campo («Contraseña actual» o «Contraseña temporal»).
+ * @param buttonText texto del botón de envío.
+ */
 @Composable
 private fun PasswordChangeForm(vm: AppViewModel, s: PasswordChangeState, currentLabel: String, buttonText: String) {
     PasswordField(value = s.current, onValueChange = { s.current = it }, label = currentLabel)
@@ -153,6 +172,10 @@ private fun PasswordChangeForm(vm: AppViewModel, s: PasswordChangeState, current
 /**
  * Pantalla obligatoria cuando el administrador restableció la contraseña (mustChangePassword):
  * hasta cambiarla, el servidor rechaza las demás rutas.
+ *
+ * PrismaApp la muestra en lugar de la navegación mientras `session.mustChangePassword` sea true. El campo
+ * de la contraseña temporal viene precargado (AppViewModel.startSession). Al cambiarla, el servidor
+ * devuelve un token nuevo sin la marca y la app pasa sola a la navegación principal.
  */
 @Composable
 fun ForcedPasswordScreen(vm: AppViewModel) {

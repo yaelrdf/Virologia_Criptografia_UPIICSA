@@ -1,16 +1,24 @@
 // Mide las métricas que cita la documentación. Uso (desde Examen_Prisma):
 //   dotnet run --project tools/Prisma.Metrics -c Release -- src/Prisma.Api/data/catalog docs/metricas.md
+// Program.cs — Medidor de métricas de ABCO (aplicación de consola con instrucciones de nivel superior).
+// Calcula entropía, avalancha, sensibilidad a la clave, un ataque de texto claro conocido, PSNR y
+// estegoanálisis χ² sobre el catálogo, integridad y robustez, tiempos y espacio de claves. Escribe la
+// tabla en Markdown en docs/metricas.md y la muestra en la consola.
+// Argumentos: [0] carpeta del catálogo (la API lo genera al arrancar por primera vez), [1] archivo de salida.
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Prisma.Core;
 
+// Cultura invariante: punto decimal en todas las cifras, sin importar el idioma del sistema.
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 string catalogDir = args.Length > 0 ? args[0] : "src/Prisma.Api/data/catalog";
 string outFile = args.Length > 1 ? args[1] : "docs/metricas.md";
 var md = new StringBuilder();
+// Semilla fija: los mensajes y posiciones aleatorias se repiten en cada ejecución (salvo sales y cargas del CSPRNG).
 var rng = new Random(2026);
+// Escribe una línea en el Markdown y en la consola a la vez.
 void Line(string s = "") { md.AppendLine(s); Console.WriteLine(s); }
 
 Line("# Métricas medidas de ABCO");
@@ -23,6 +31,7 @@ const string Spanish = "La criptografia estudia como proteger la informacion de 
     "El cifrado Cesar desplaza cada letra un numero fijo de posiciones del alfabeto; la esteganografia oculta la existencia del mensaje. ";
 string text = string.Concat(Enumerable.Repeat(Spanish, 10));
 byte[] plain = Encoding.UTF8.GetBytes(text);
+// Claves fijas (frase y sal constantes) para que las secciones que no dependen de la sal sean reproducibles.
 var keys = PrismaKeys.Derive("frase-secreta", Encoding.ASCII.GetBytes("sal-fija-16bytes"));
 Line("## 1. Entropía de Shannon (bits por byte, máximo 8)");
 Line($"Texto en español (sin tildes) de {plain.Length} bytes.");
@@ -39,6 +48,7 @@ Line();
 Line("## 2. Difusión (avalancha, Monte Carlo con 2 000 ensayos)");
 Line("Se cambia 1 bit al azar del texto claro de 64 bytes y se mide la fracción de bits que cambian en la salida. Un cifrador ideal da ≈ 50 %.");
 Line();
+// César byte a byte (+3 mod 256) para medir su avalancha con los mismos mensajes binarios.
 byte[] CaesarBytes(byte[] m) => m.Select(b => (byte)(b + 3)).ToArray();
 double avP = Metrics.Avalanche(m => PrismaCipher.Encrypt(m, keys), 64, 2000, rng);
 double avC = Metrics.Avalanche(CaesarBytes, 64, 2000, rng);
@@ -49,6 +59,7 @@ for (int t = 0; t < trials; t++)
     var m = new byte[64]; rng.NextBytes(m); var m2 = (byte[])m.Clone();
     int bit = rng.Next(512); m2[bit >> 3] ^= (byte)(1 << (bit & 7));
     var c1 = PrismaCipher.Encrypt(m, keys); var c2 = PrismaCipher.Encrypt(m2, keys);
+    // Primer byte del bloque de 2 bytes que contiene el bit alterado (índice de byte redondeado a par).
     int from = (bit >> 3) & ~1, diff = 0;
     for (int i = from; i < 64; i++) diff += System.Numerics.BitOperations.PopCount((uint)(c1[i] ^ c2[i]));
     fwd += (double)diff / ((64 - from) * 8);
@@ -63,7 +74,8 @@ Line();
 Line("Lectura: el encadenamiento propaga el cambio **hacia adelante**, no hacia atrás; por eso el promedio sobre el mensaje completo es menor.");
 Line();
 
-// 3. Avalancha de clave
+// 2b. Avalancha de clave (parte de la sección 2)
+// Dos frases que difieren en una letra, con la misma sal y el mismo mensaje: mide cuánto depende el cifrado de la frase.
 int keyTrials = 40; double keyAv = 0;
 for (int t = 0; t < keyTrials; t++)
 {
@@ -76,22 +88,27 @@ for (int t = 0; t < keyTrials; t++)
 Line($"**Sensibilidad a la clave:** cambiar una letra de la frase (\"frase-secreta\" → \"frase-secretb\") cambia el **{100 * keyAv / keyTrials:F2} %** de los bits del cifrado ({keyTrials} ensayos).");
 Line();
 
-// 4. Ataque de texto claro conocido (KPA) a Hill puro vs ABCO
+// 3. Ataque de texto claro conocido (KPA) a Hill puro vs ABCO
 Line("## 3. Ataque de texto claro conocido (álgebra lineal)");
 var hill = keys.A;
+// Hill puro con la misma matriz que ABCO: C = A·P por bloque, sin desplazamiento ni encadenamiento.
 byte[] HillPure(byte[] m) { var o = new byte[m.Length]; for (int i = 0; i < m.Length; i += 2) { var (x, y) = hill.Mul(m[i], m[i + 1]); o[i] = (byte)x; o[i + 1] = (byte)y; } return o; }
+// Ataque algebraico: estima A con dos bloques conocidos y cuenta cuántos bloques nuevos predice esa estimación.
 (Matrix2? A, int Hits, int Total) Attack(Func<byte[], byte[]> enc)
 {
     // El atacante conoce pares (P, C). Con dos bloques P₁, P₂ cuyo det es impar: A = [C₁ C₂]·[P₁ P₂]⁻¹ (mod 256).
     for (int attempt = 0; attempt < 200; attempt++)
     {
         var m = new byte[4]; rng.NextBytes(m);
+        // Matrices con los bloques como columnas: P = [P₁ P₂] = [[m0, m2], [m1, m3]].
         var P = new Matrix2(m[0], m[2], m[1], m[3]);
         if ((ModMath.Det(P) & 1) == 0) continue;
         var c = enc(m);
         var C = new Matrix2(c[0], c[2], c[1], c[3]);
         var Pi = ModMath.Inverse(P);
+        // Producto C·P⁻¹ mod 256 escrito componente a componente.
         var guess = new Matrix2((C.A * Pi.A + C.B * Pi.C) & 0xFF, (C.A * Pi.B + C.B * Pi.D) & 0xFF, (C.C * Pi.A + C.D * Pi.C) & 0xFF, (C.C * Pi.B + C.D * Pi.D) & 0xFF);
+        // Validación: 1000 bloques nuevos; en Hill puro se predicen todos, en ABCO prácticamente ninguno.
         int hits = 0, total = 1000;
         for (int t = 0; t < total; t++)
         {
@@ -113,7 +130,7 @@ Line($"| Hill puro 2×2 (C = A·P) | {aHill} | {hHill} de {nHill} |");
 Line($"| ABCO | {aPrisma} | {hPrisma} de {nPrisma} |");
 Line();
 
-// 5. Estego: PSNR, capacidad y estegoanálisis
+// 4. Estego: PSNR, capacidad y estegoanálisis
 Line("## 4. Esteganografía: distorsión y detectabilidad");
 var files = Directory.Exists(catalogDir) ? Directory.GetFiles(catalogDir, "*.png").OrderBy(f => f).ToArray() : [];
 if (files.Length == 0) Line($"(No se encontró el catálogo en `{catalogDir}`; arranca la API una vez para generarlo.)");
@@ -125,6 +142,8 @@ else
     Line();
     Line("| Mensaje | Modo | PSNR (dB) | P(mensaje) χ² al 10 % inicial | P(mensaje) χ² en toda la imagen |");
     Line("|---|---|---|---|---|");
+    // Tamaños de carga crecientes; los que no caben en la portadora se omiten.
+    // Cargas aleatorias: equivalen a un cifrado, que es lo que realmente se oculta.
     foreach (int size in new[] { 32, 1024, 10_240, 57_000, 114_000 })
     {
         if (size > cap) continue;
@@ -144,16 +163,21 @@ else
     Line("## 4b. Integridad y robustez (escenarios E3 y E6)");
     var secret = Encoding.UTF8.GetBytes("Hola Bob, nos vemos a las 18:00");
     var stego = PrismaStego.Embed(cover, secret, "girasol-azul-42");
+    // Intenta revelar y resume el resultado; StegoException es el error genérico de ABCO.
     string Try(RgbImage img, string pass)
     {
         try { return "se revela: «" + Encoding.UTF8.GetString(PrismaStego.Reveal(img, pass)) + "»"; }
         catch (StegoException) { return "error genérico (rechazado)"; }
     }
+    // Se reconstruye el recorrido con la frase correcta para elegir canales dentro y fuera de la trama.
     var salt = PrismaStego.ReadBits(stego.Channels, i => i, PrismaStego.SaltBytes);
     var path = FisherYates.Path(stego.Channels.Length, PrismaKeys.Derive("girasol-azul-42", salt).Seed);
     var inPath = stego.Clone(); inPath.Channels[path[200]] ^= 1;
+    // path[^1] es el último canal del recorrido: un mensaje corto nunca llega a usarlo.
     var outside = stego.Clone(); outside.Channels[path[^1]] ^= 1;
+    // Alterar la sal cambia todas las claves derivadas, así que el HMAC ya no coincide.
     var saltHit = stego.Clone(); saltHit.Channels[5] ^= 1;
+    // Recompresión JPEG (con pérdida), como al "enviar como foto" por mensajería.
     using var skBmp = SkiaSharp.SKBitmap.Decode(ImageIO.EncodePng(stego));
     var jpeg90 = ImageIO.Decode(skBmp.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 90).ToArray());
     var jpeg100 = ImageIO.Decode(skBmp.Encode(SkiaSharp.SKEncodedImageFormat.Jpeg, 100).ToArray());
@@ -171,8 +195,9 @@ else
     Line($"| Recomprimida como JPEG calidad 100 | {Try(jpeg100, "girasol-azul-42")} |");
     Line();
 
-    // 6. Tiempos
+    // 5. Tiempos
     Line("## 5. Tiempos (promedio de 5 ejecuciones)");
+    // Una ejecución de calentamiento (JIT y cachés) y luego el promedio de 5.
     double Time(Action a) { a(); var sw = Stopwatch.StartNew(); for (int i = 0; i < 5; i++) a(); return sw.Elapsed.TotalMilliseconds / 5; }
     var msg = Encoding.UTF8.GetBytes("Mensaje de prueba de 64 bytes para medir los tiempos de ABCO....");
     var st = PrismaStego.Embed(cover, msg, "frase-secreta");
@@ -187,7 +212,8 @@ else
     Line();
 }
 
-// 7. Espacio de claves
+// 6. Espacio de claves
+// |GL₂(ℤ₂₅₆)| = 2^{4·7}·|GL₂(ℤ₂)| = 2²⁸·6 matrices invertibles; s₀ toma 256 valores, a 63 y c 128.
 Line("## 6. Espacio de claves");
 Line("| Algoritmo | Claves posibles |");
 Line("|---|---|");
@@ -198,4 +224,5 @@ Line("| Semilla del recorrido | 2⁶⁴ |");
 Line("| Material de clave de ABCO | Derivado de la frase con PBKDF2 (32 B): la seguridad práctica depende de la frase |");
 
 File.WriteAllText(outFile, md.ToString());
+// Aviso por stderr para no mezclarlo con la tabla impresa en stdout.
 Console.Error.WriteLine($"→ {outFile}");

@@ -1,3 +1,5 @@
+// Componentes Compose reutilizables de ABCO: AdaptivePane (1 o 2 columnas), distribución tipo masonry,
+// tarjetas, botones con progreso, campos de contraseña, selectores segmentados y ayuda para el teclado.
 package mx.ipn.upiicsa.prisma.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -82,13 +84,19 @@ import kotlinx.coroutines.flow.collectLatest
 import mx.ipn.upiicsa.prisma.data.StegoMode
 import mx.ipn.upiicsa.prisma.data.ThemeMode
 
-/** true cuando la ventana mide ≥ 600 dp de ancho (tableta, plegable, horizontal). */
+/**
+ * true cuando la ventana mide ≥ 600 dp de ancho (tableta, plegable, horizontal).
+ * Lo publica PrismaApp; el valor por defecto (false) aplica a vistas previas y pruebas.
+ */
 val LocalWideLayout = compositionLocalOf { false }
 
-/** Ancho máximo del contenido en pantallas grandes. */
+/** Ancho máximo del contenido en pantallas grandes, para que las líneas de texto no sean demasiado largas. */
 val MaxContentWidth = 1200.dp
 
-/** Ancho disponible (del panel, no de la ventana) a partir del cual se usan 2 columnas. */
+/**
+ * Ancho disponible (del panel, no de la ventana) a partir del cual se usan 2 columnas. Se mide el panel
+ * porque con el NavigationRail el espacio útil es menor que la ventana; 560 dp dejan ≈ 270 dp por columna.
+ */
 val TwoColumnMinWidth = 560.dp
 
 /**
@@ -100,6 +108,13 @@ val TwoColumnMinWidth = 560.dp
  *
  * Cada elemento de [form] (normalmente una [SectionCard]) es una pieza que se reparte entre las columnas.
  * Los contenedores con scroll llevan imePadding() para que el teclado no tape los campos.
+ *
+ * @param title título de la pantalla.
+ * @param subtitle descripción breve debajo del título.
+ * @param hasResult hay un resultado que mostrar; en panel ancho cambia la distribución a formulario | resultado.
+ * @param headerActions botones opcionales a la derecha del título (p. ej. «Actualizar»).
+ * @param form tarjetas del formulario.
+ * @param result contenido del resultado (errores incluidos).
  */
 @Composable
 fun AdaptivePane(
@@ -111,9 +126,13 @@ fun AdaptivePane(
     result: @Composable ColumnScope.() -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // Se mide el ancho del panel (ya descontado el NavigationRail), no el de la ventana.
         val wide = maxWidth >= TwoColumnMinWidth
         when {
             !wide -> Column(
+                // 640 dp de ancho máximo: en un panel angosto pero no tan pequeño las tarjetas no se estiran.
+                // imePadding antes de verticalScroll: el área con scroll se acorta por encima del teclado y
+                // así se puede desplazar hasta el último campo.
                 Modifier.widthIn(max = 640.dp).fillMaxSize().imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 16.dp),
@@ -136,6 +155,8 @@ fun AdaptivePane(
                 result()
             }
             else -> Row(
+                // En dos columnas cada una tiene su propio scroll e imePadding, para desplazar el formulario
+                // sin mover el resultado.
                 Modifier.widthIn(max = MaxContentWidth).fillMaxSize().padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
@@ -162,6 +183,12 @@ fun AdaptivePane(
  * Reparte sus hijos en [columns] columnas de igual ancho, colocando cada uno en la columna
  * más baja (tipo "masonry"); así el orden de lectura se conserva (1.º a la izquierda, 2.º a la derecha)
  * y las columnas quedan equilibradas. Con un solo hijo, este ocupa todo el ancho.
+ *
+ * Se usa un Layout propio porque Row con dos Column obligaría a decidir de antemano qué tarjeta va en cada
+ * columna, y LazyVerticalStaggeredGrid no puede ir dentro de un contenedor con verticalScroll.
+ *
+ * @param columns número de columnas.
+ * @param spacing separación horizontal y vertical entre hijos.
  */
 @Composable
 fun MasonryColumns(
@@ -177,8 +204,10 @@ fun MasonryColumns(
             val p = measurables.firstOrNull()?.measure(Constraints(minWidth = width, maxWidth = width))
             return@Layout layout(width, p?.height ?: 0) { p?.placeRelative(0, 0) }
         }
+        // Ancho de columna: el total menos los espacios entre columnas, repartido por igual.
         val colWidth = ((width - gap * (columns - 1)) / columns).coerceAtLeast(0)
         val heights = IntArray(columns)
+        // Cada hijo va a la columna con menor altura acumulada; en empate, la de más a la izquierda.
         val placed = measurables.map { m ->
             val p = m.measure(Constraints(minWidth = colWidth, maxWidth = colWidth))
             val col = heights.indices.minBy { heights[it] }
@@ -186,6 +215,7 @@ fun MasonryColumns(
             heights[col] += p.height + gap
             Triple(p, col, y)
         }
+        // Se resta el último espacio, que queda debajo del hijo más bajo de la columna más alta.
         val height = (heights.maxOrNull() ?: 0) - gap
         layout(width, height.coerceAtLeast(0)) {
             placed.forEach { (p, col, y) -> p.placeRelative(col * (colWidth + gap), y) }
@@ -193,6 +223,11 @@ fun MasonryColumns(
     }
 }
 
+/**
+ * Encabezado de pantalla: título, subtítulo opcional y acciones a la derecha.
+ *
+ * @param actions botones opcionales; el título ocupa el resto del ancho.
+ */
 @Composable
 fun ScreenHeader(title: String, subtitle: String?, actions: (@Composable RowScope.() -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -206,6 +241,11 @@ fun ScreenHeader(title: String, subtitle: String?, actions: (@Composable RowScop
     }
 }
 
+/**
+ * Tarjeta de sección del formulario o del resultado; es la pieza que AdaptivePane reparte entre columnas.
+ *
+ * @param title título opcional de la sección.
+ */
 @Composable
 fun SectionCard(
     title: String? = null,
@@ -220,6 +260,12 @@ fun SectionCard(
     }
 }
 
+/**
+ * Tarjeta de error con los colores de error del tema.
+ *
+ * @param message mensaje en español (normalmente el de [mx.ipn.upiicsa.prisma.data.ApiException]).
+ * @param extra contenido adicional, p. ej. los bytes en hex que vería un atacante en Revelar.
+ */
 @Composable
 fun ErrorCard(message: String, extra: (@Composable ColumnScope.() -> Unit)? = null) {
     Card(
@@ -256,6 +302,10 @@ fun WarningCard(message: String) {
     }
 }
 
+/**
+ * Botón principal que muestra un indicador de progreso y se deshabilita mientras [loading] es true,
+ * para evitar enviar la misma petición dos veces.
+ */
 @Composable
 fun LoadingButton(
     text: String,
@@ -270,6 +320,7 @@ fun LoadingButton(
     }
 }
 
+/** Contenido de un botón: indicador de progreso o ícono opcional, y texto en una línea. */
 @Composable
 fun RowScope.ButtonContent(text: String, loading: Boolean, icon: ImageVector? = null) {
     when {
@@ -285,6 +336,8 @@ fun RowScope.ButtonContent(text: String, loading: Boolean, icon: ImageVector? = 
  * desplaza el contenedor con scroll para que el campo quede a la vista. Con enableEdgeToEdge
  * la ventana ya no se redimensiona (adjustResize) y el teclado aparece después del foco, por eso
  * se espera a que su animación se asiente.
+ *
+ * Debe aplicarse dentro de un contenedor con verticalScroll e imePadding (como AdaptivePane).
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.bringIntoViewOnFocus(): Modifier = composed {
@@ -294,6 +347,8 @@ fun Modifier.bringIntoViewOnFocus(): Modifier = composed {
     val ime = WindowInsets.ime
     LaunchedEffect(focused) {
         if (!focused) return@LaunchedEffect
+        // collectLatest: cada cambio de altura del teclado durante su animación cancela la espera anterior,
+        // así el desplazamiento se hace una sola vez, con la altura final.
         snapshotFlow { ime.getBottom(density) }.collectLatest {
             delay(120)
             requester.bringIntoView()
@@ -302,7 +357,12 @@ fun Modifier.bringIntoViewOnFocus(): Modifier = composed {
     this.bringIntoViewRequester(requester).onFocusChanged { focused = it.isFocused }
 }
 
-/** Campo de contraseña o frase: oculto por defecto, con botón para mostrarlo. */
+/**
+ * Campo de contraseña o frase: oculto por defecto, con botón para mostrarlo.
+ *
+ * @param imeAction acción de la tecla Intro del teclado (siguiente campo o «Listo»).
+ * @param onDone se invoca con la acción «Listo» del teclado, p. ej. para enviar el formulario.
+ */
 @Composable
 fun PasswordField(
     value: String,
@@ -314,6 +374,7 @@ fun PasswordField(
     onDone: (() -> Unit)? = null,
     isError: Boolean = false,
 ) {
+    // rememberSaveable: la visibilidad se conserva al rotar. Cada campo tiene la suya.
     var visible by rememberSaveable { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -323,6 +384,7 @@ fun PasswordField(
         isError = isError,
         modifier = modifier.fillMaxWidth().bringIntoViewOnFocus(),
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        // KeyboardType.Password evita sugerencias y que el teclado aprenda la contraseña; sin autocorrección.
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
         supportingText = supportingText?.let { { Text(it) } },
@@ -332,6 +394,7 @@ fun PasswordField(
     )
 }
 
+/** Selector segmentado del modo de ocultamiento: ABCO o esteganografía clásica. */
 @Composable
 fun ModeSelector(mode: StegoMode, onChange: (StegoMode) -> Unit) {
     val modes = StegoMode.entries
@@ -380,6 +443,12 @@ fun ThemeModeSelector(mode: ThemeMode, onChange: (ThemeMode) -> Unit, modifier: 
     }
 }
 
+/**
+ * Vista previa de una imagen ajustada al ancho, con altura máxima. Mientras [bitmap] es null muestra un
+ * indicador de progreso (la imagen se está decodificando).
+ *
+ * @param maxHeight altura máxima en dp.
+ */
 @Composable
 fun ImagePreview(bitmap: ImageBitmap?, description: String, modifier: Modifier = Modifier, maxHeight: Int = 360) {
     Box(
@@ -399,7 +468,7 @@ fun ImagePreview(bitmap: ImageBitmap?, description: String, modifier: Modifier =
     }
 }
 
-/** Fila "etiqueta: valor" para resultados. */
+/** Fila "etiqueta: valor" para resultados. El valor se puede seleccionar y copiar. */
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

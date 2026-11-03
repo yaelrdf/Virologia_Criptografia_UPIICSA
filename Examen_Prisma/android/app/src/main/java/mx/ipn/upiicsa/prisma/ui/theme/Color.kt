@@ -1,10 +1,14 @@
+// Colores de la app ABCO para el tema claro y el oscuro; Theme.kt los asigna a los roles de Material 3.
 package mx.ipn.upiicsa.prisma.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
 // Paleta común con la web de ABCO: verde "terminal" sobre grises neutros.
+// Roles: Green = primario, Slate = secundario, Amber = terciario (avisos); los Container* son los niveles
+// de superficie de Material 3, del más bajo al más alto.
 
 // ---- Claro ----
+// Verdes más oscuros para mantener buen contraste sobre fondo blanco.
 val GreenLight = Color(0xFF2E7D1F)
 val GreenContainerLight = Color(0xFFD7F5CC)
 val OnGreenContainerLight = Color(0xFF0C2E05)
@@ -31,6 +35,7 @@ val ContainerHighLight = Color(0xFFEAEEF0)
 val ContainerHighestLight = Color(0xFFE3E8EB)
 
 // ---- Oscuro ----
+// Verdes y ámbar más brillantes para leerse sobre grises casi negros.
 val GreenDark = Color(0xFF6BE64A)
 val OnGreenDark = Color(0xFF0B2A04)
 val GreenContainerDark = Color(0xFF1F4A14)

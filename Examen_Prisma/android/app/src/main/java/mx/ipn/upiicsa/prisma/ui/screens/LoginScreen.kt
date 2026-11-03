@@ -1,3 +1,5 @@
+// Pantalla de inicio de sesión de ABCO: login y registro, paso de la imagen-llave (2FA),
+// «¿Olvidaste tu contraseña?» y diálogo de ajustes (tema y URL del servidor con aviso para HTTP).
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -61,6 +63,9 @@ import mx.ipn.upiicsa.prisma.ui.theme.successColor
 /**
  * Inicio de sesión. En pantallas anchas (≥ 720 dp disponibles): logo y descripción a la izquierda,
  * formulario a la derecha. En teléfono: una columna con el logo junto al nombre.
+ *
+ * Lee [AppViewModel.login] (a través de las tarjetas) y [AppViewModel.serverUrl]. Los diálogos de ajustes
+ * y de contraseña olvidada se controlan con estado local guardable, así sobreviven a la rotación.
  */
 @Composable
 fun LoginScreen(vm: AppViewModel) {
@@ -68,8 +73,10 @@ fun LoginScreen(vm: AppViewModel) {
     var showForgot by rememberSaveable { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // 720 dp: con menos, dos columnas dejarían el formulario demasiado angosto para los campos y botones.
         val twoColumns = maxWidth >= 720.dp
         Column(
+            // imePadding antes de verticalScroll: el contenido se puede desplazar por encima del teclado.
             Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = if (twoColumns) 32.dp else 16.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -113,6 +120,7 @@ fun LoginScreen(vm: AppViewModel) {
     if (showForgot) ForgotPasswordDialog(onDismiss = { showForgot = false })
 }
 
+/** Botón de engrane que abre el diálogo de ajustes (tema y servidor). */
 @Composable
 private fun SettingsButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
@@ -120,7 +128,11 @@ private fun SettingsButton(onClick: () -> Unit) {
     }
 }
 
-/** Logo del panda junto al nombre ABCO. */
+/**
+ * Logo del panda junto al nombre ABCO.
+ *
+ * @param large usa el título más grande (diseño de 2 columnas).
+ */
 @Composable
 private fun Brand(logoSize: Dp, large: Boolean, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -145,6 +157,7 @@ private fun Brand(logoSize: Dp, large: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
+/** Lista breve de funciones de la app; solo se muestra en el diseño de 2 columnas, donde hay espacio. */
 @Composable
 private fun Description() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -155,6 +168,7 @@ private fun Description() {
     }
 }
 
+/** Elemento de lista con viñeta. */
 @Composable
 private fun Bullet(text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -163,6 +177,7 @@ private fun Bullet(text: String) {
     }
 }
 
+/** URL del servidor en uso y, si es HTTP, el aviso de conexión sin cifrar. */
 @Composable
 private fun ServerInfo(vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -172,6 +187,7 @@ private fun ServerInfo(vm: AppViewModel) {
     }
 }
 
+/** Tarjeta del login: muestra el paso de usuario y contraseña o, si el servidor pidió 2FA, el de la imagen-llave. */
 @Composable
 private fun LoginCard(vm: AppViewModel, onForgot: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth()) {
@@ -179,6 +195,12 @@ private fun LoginCard(vm: AppViewModel, onForgot: () -> Unit) {
     }
 }
 
+/**
+ * Paso 1: pestañas «Iniciar sesión» / «Crear cuenta», campos y botón principal. Al iniciar sesión también
+ * ofrece «¿Olvidaste tu contraseña?».
+ *
+ * @param onForgot abre el diálogo de contraseña olvidada.
+ */
 @Composable
 private fun CredentialsStep(vm: AppViewModel, onForgot: () -> Unit) {
     val s = vm.login
@@ -194,6 +216,7 @@ private fun CredentialsStep(vm: AppViewModel, onForgot: () -> Unit) {
                 value = s.username, onValueChange = { s.username = it },
                 label = { Text("Usuario") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().bringIntoViewOnFocus(),
+                // Ascii: teclado sin acentos ni emoji, acorde con los caracteres permitidos en el usuario.
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
                 supportingText = if (s.registering) {
                     { Text("3 a 32 caracteres: letras, números, punto, guion o guion bajo") }
@@ -202,6 +225,7 @@ private fun CredentialsStep(vm: AppViewModel, onForgot: () -> Unit) {
             PasswordField(
                 value = s.password, onValueChange = { s.password = it }, label = "Contraseña",
                 supportingText = if (s.registering) "Mínimo 8 caracteres" else null,
+                // Al iniciar sesión «Listo» envía el formulario; al registrar, pasa a la confirmación.
                 imeAction = if (s.registering) ImeAction.Next else ImeAction.Done,
                 onDone = { vm.submitCredentials() },
             )
@@ -228,6 +252,10 @@ private fun CredentialsStep(vm: AppViewModel, onForgot: () -> Unit) {
     }
 }
 
+/**
+ * Diálogo de «¿Olvidaste tu contraseña?»: no hay recuperación automática; el administrador la restablece
+ * y el usuario recibe una contraseña temporal que debe cambiar al entrar.
+ */
 @Composable
 private fun ForgotPasswordDialog(onDismiss: () -> Unit) {
     AlertDialog(
@@ -239,12 +267,17 @@ private fun ForgotPasswordDialog(onDismiss: () -> Unit) {
     )
 }
 
-/** Paso 2 del login: la cuenta tiene 2FA y se debe subir la imagen-llave. */
+/**
+ * Paso 2 del login: la cuenta tiene 2FA y se debe subir la imagen-llave.
+ * Lee `keyUri`, `keyName` y `keyPreview` de [AppViewModel.login]; dispara [AppViewModel.submitKeyImage]
+ * o vuelve atrás con [AppViewModel.cancelKeyStep] (deshabilitado mientras se verifica).
+ */
 @Composable
 private fun KeyStep(vm: AppViewModel) {
     val s = vm.login
     // OpenDocument permite elegir el PNG desde Descargas o cualquier proveedor de archivos
-    // (el selector de fotos podría entregar una copia recomprimida).
+    // (el selector de fotos podría entregar una copia recomprimida o sin los metadatos originales, y la
+    // imagen-llave debe llegar al servidor byte por byte).
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.pickLoginKey(uri)
     }
@@ -271,7 +304,14 @@ private fun KeyStep(vm: AppViewModel) {
     }
 }
 
-/** Ajustes antes de iniciar sesión: tema de la app y URL del servidor. */
+/**
+ * Ajustes antes de iniciar sesión: tema de la app y URL del servidor.
+ *
+ * La URL se edita en un estado local y solo se guarda al pulsar «Guardar» (si es válida); «Probar
+ * conexión» prueba la URL escrita sin guardarla. Lee [AppViewModel.serverTest] para el resultado.
+ *
+ * @param onDismiss cierra el diálogo.
+ */
 @Composable
 fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var url by rememberSaveable { mutableStateOf(vm.serverUrl) }
@@ -283,6 +323,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         title = { Text("Ajustes") },
         text = {
             Column(
+                // Scroll propio: en horizontal o con el teclado abierto el diálogo puede no caber.
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -292,6 +333,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 Text("Servidor", style = MaterialTheme.typography.titleSmall)
                 OutlinedTextField(
                     value = url,
+                    // Al editar se borra el resultado de la prueba anterior, que ya no corresponde a esta URL.
                     onValueChange = { url = it; invalid = false; t.ok = null; t.message = null },
                     label = { Text("URL del servidor") },
                     singleLine = true,
@@ -321,6 +363,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
+                // Sin cambios no se guarda (evita vaciar el catálogo y el aviso de «Servidor guardado»).
                 when {
                     url.trim().trimEnd('/') == vm.serverUrl -> onDismiss()
                     vm.saveServer(url) -> onDismiss()
@@ -332,9 +375,13 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     )
 }
 
-/** true si la URL usa HTTP sin cifrar. */
+/**
+ * true si la URL usa HTTP sin cifrar. La política de red de la app permite HTTP (servidor en la red local
+ * sin certificado), así que en ese caso solo se muestra un aviso.
+ */
 private fun isCleartext(url: String) = url.trim().startsWith("http://", ignoreCase = true)
 
+/** Aviso de conexión sin cifrar; usa el color terciario (ámbar) porque es una advertencia, no un error. */
 @Composable
 private fun CleartextWarning() {
     Text(

@@ -1,3 +1,5 @@
+// Componentes de imagen de ABCO: selector de portadora (catálogo o galería) y acciones para guardar o
+// compartir el PNG generado por el servidor sin recomprimirlo.
 package mx.ipn.upiicsa.prisma.ui.components
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -53,10 +55,21 @@ import mx.ipn.upiicsa.prisma.ui.PickedImage
 /**
  * Selector de imagen: rejilla con las portadoras del catálogo del servidor
  * o una imagen de la galería (Photo Picker), con vista previa de la elegida.
+ *
+ * Aquí sí se usa el selector de fotos: la imagen es una portadora o la base de una imagen-llave nueva, aún
+ * sin mensaje oculto, así que no importa si el sistema entrega una copia convertida. Para abrir una imagen
+ * que YA trae información (Revelar, imagen-llave del login) se usa OpenDocument, que da el archivo exacto.
+ *
+ * Lee [AppViewModel.catalog], [AppViewModel.thumbs] y [PickedImage.source]; dispara la carga del catálogo.
+ *
+ * @param picked imagen elegida actualmente (para marcarla y mostrar su vista previa).
+ * @param onSelect se invoca con la imagen del catálogo o el archivo local elegido.
  */
 @Composable
 fun CatalogOrGalleryPicker(vm: AppViewModel, picked: PickedImage, onSelect: (ImageSource) -> Unit) {
+    // Carga el catálogo la primera vez que aparece el selector (no hace nada si ya está cargado).
     LaunchedEffect(Unit) { vm.loadCatalog() }
+    // El Photo Picker no pide permisos de almacenamiento y da acceso temporal solo a la imagen elegida.
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onSelect(vm.localSource(uri))
     }
@@ -136,6 +149,12 @@ fun CatalogOrGalleryPicker(vm: AppViewModel, picked: PickedImage, onSelect: (Ima
 /**
  * Botones "Guardar" (CreateDocument) y "Compartir como archivo" (FileProvider + ACTION_SEND)
  * para un PNG generado por el servidor. Antes de compartir avisa de no enviarlo "como foto".
+ *
+ * Guardar usa CreateDocument (el usuario elige carpeta y nombre) en vez de escribir en la galería: no
+ * requiere permisos de almacenamiento y se escriben los bytes exactos del PNG.
+ *
+ * @param png bytes del PNG tal como llegaron del servidor.
+ * @param fileName nombre sugerido al guardar y al compartir.
  */
 @Composable
 fun PngActions(vm: AppViewModel, png: ByteArray, fileName: String) {
@@ -143,6 +162,8 @@ fun PngActions(vm: AppViewModel, png: ByteArray, fileName: String) {
     val scope = rememberCoroutineScope()
     var askShare by rememberSaveable { mutableStateOf(false) }
     val currentPng = remember(png) { png }
+    // El callback del selector se registra una vez; currentPng (recordado con la clave png) le da los bytes
+    // del resultado actual aunque cambie mientras el selector está abierto.
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
         if (uri != null) vm.savePng(uri, currentPng)
     }
@@ -171,6 +192,7 @@ fun PngActions(vm: AppViewModel, png: ByteArray, fileName: String) {
             confirmButton = {
                 TextButton(onClick = {
                     askShare = false
+                    // Corrutina del Composable: copiar el archivo a la caché corre en IO dentro de sharePng.
                     scope.launch {
                         try {
                             Files.sharePng(context, currentPng, fileName)

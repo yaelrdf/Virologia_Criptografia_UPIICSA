@@ -1,3 +1,5 @@
+// Pantalla Revelar de ABCO: elegir el PNG recibido, el modo y la frase, y mostrar el mensaje oculto.
+// Si falla, muestra lo que vería un atacante leyendo los bits en orden.
 package mx.ipn.upiicsa.prisma.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,10 +28,16 @@ import mx.ipn.upiicsa.prisma.ui.components.PasswordField
 import mx.ipn.upiicsa.prisma.ui.components.SectionCard
 import mx.ipn.upiicsa.prisma.ui.theme.MonoStyle
 
+/**
+ * Pantalla Revelar. Lee [AppViewModel.reveal] (imagen, modo, frase, resultado, error y bytes en hex) y
+ * dispara [AppViewModel.pickStegoImage] y [AppViewModel.extract].
+ */
 @Composable
 fun RevealScreen(vm: AppViewModel) {
     val s = vm.reveal
     // OpenDocument entrega el archivo original (sin recompresión), también desde Descargas.
+    // No se usa el selector de fotos: puede devolver una copia convertida o recomprimida y con ello
+    // se perderían los bits del mensaje oculto.
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.pickStegoImage(uri)
     }
@@ -66,6 +74,7 @@ fun RevealScreen(vm: AppViewModel) {
             if (s.loading) SectionCard { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Leyendo…") }
             s.error?.let { err ->
                 ErrorCard(err) {
+                    // Solo con 422: muestra que, sin la frase correcta, lo leído en orden parece basura.
                     s.rawHex?.let { hex ->
                         Text(
                             "Esto es lo que vería un atacante leyendo los bits menos significativos en orden:",
@@ -77,6 +86,7 @@ fun RevealScreen(vm: AppViewModel) {
             }
             s.result?.let { r ->
                 SectionCard("Mensaje revelado") {
+                    // SelectionContainer permite seleccionar y copiar el mensaje revelado.
                     SelectionContainer {
                         Text(r.message, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     }
