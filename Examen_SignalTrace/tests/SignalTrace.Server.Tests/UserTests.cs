@@ -6,9 +6,10 @@ using SignalTrace.Core;
 
 namespace SignalTrace.Server.Tests;
 
-/// <summary>User management: roles, admin password reset and changing one's own password.</summary>
+/// <summary>Gestión de usuarios: roles, restablecimiento de contraseña por el administrador y cambio de la contraseña propia.</summary>
 public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
 {
+    /// <summary>Envía una solicitud autenticada con cuerpo JSON opcional.</summary>
     private static async Task<HttpResponseMessage> Send(HttpClient http, HttpMethod method, string url, string token, object? body = null)
     {
         var req = new HttpRequestMessage(method, url) { Content = body is null ? null : JsonContent.Create(body) };
@@ -16,6 +17,7 @@ public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         return await http.SendAsync(req);
     }
 
+    /// <summary>Crea un usuario como administrador y devuelve su id.</summary>
     private static async Task<int> CreateUser(HttpClient http, string admin, string name, string password, string role = "viewer")
     {
         var r = await Send(http, HttpMethod.Post, "/api/users", admin, new CreateUserRequest(name, password, role));
@@ -23,6 +25,7 @@ public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         return (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
     }
 
+    /// <summary>Un observador no puede administrar usuarios; el administrador lo promueve y su nuevo token ya tiene el rol.</summary>
     [Fact]
     public async Task Admin_ChangesRole_ViewerBecomesAdmin()
     {
@@ -36,11 +39,12 @@ public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var r = await Send(http, HttpMethod.Put, $"/api/users/{id}/role", admin, new { role = "admin" });
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await Send(http, HttpMethod.Put, $"/api/users/{id}/role", admin, new { role = "root" })).StatusCode);
-        // The role is read at login: a new token carries it.
+        // El rol se lee al iniciar sesión: un token nuevo lo incluye.
         var promoted = await TestDevice.Login(http, "rolero", "viewer-pass-1");
         Assert.Equal(HttpStatusCode.OK, (await Send(http, HttpMethod.Get, "/api/users", promoted)).StatusCode);
     }
 
+    /// <summary>No se puede quitar el rol al único administrador (servidor nuevo para que no haya otros).</summary>
     [Fact]
     public async Task LastAdmin_CannotBeDemoted()
     {
@@ -54,6 +58,7 @@ public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("last_admin", await TestDevice.Code(r));
     }
 
+    /// <summary>Tras un restablecimiento, la contraseña vieja deja de funcionar y la temporal de 16 caracteres sí funciona.</summary>
     [Fact]
     public async Task Admin_ResetsPassword_OldStopsWorking_NewWorks()
     {
@@ -68,6 +73,7 @@ public class UserTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         await TestDevice.Login(http, "olvidadizo", reset.Password);
     }
 
+    /// <summary>Cambiar la contraseña propia exige la actual correcta y una nueva de longitud válida.</summary>
     [Fact]
     public async Task User_ChangesOwnPassword_RequiresCurrent()
     {

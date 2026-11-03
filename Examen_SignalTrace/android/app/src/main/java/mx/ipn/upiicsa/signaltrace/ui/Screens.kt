@@ -49,6 +49,9 @@ import mx.ipn.upiicsa.signaltrace.data.Settings
 import mx.ipn.upiicsa.signaltrace.telemetry.EngineState
 import mx.ipn.upiicsa.signaltrace.telemetry.SensorBankCollector
 
+// Pantallas de la aplicación con Jetpack Compose y componentes reutilizables.
+
+/** Tarjeta con título y contenido en columna. */
 @Composable
 fun Section(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
@@ -59,15 +62,18 @@ fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Texto en fuente monoespaciada (JSON, hexadecimal, bitácora). */
 @Composable
 fun Mono(text: String) = Text(text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
 
+/** Fila llave–valor. */
 @Composable
 fun Kv(k: String, v: String) = Row(Modifier.fillMaxWidth()) {
     Text(k, Modifier.weight(0.42f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     Text(v, Modifier.weight(0.58f), style = MaterialTheme.typography.bodyMedium)
 }
 
+/** Punto de color según el nivel del estado: verde, amarillo, rojo, azul o gris. */
 @Composable
 fun StatusDot(level: EngineState.Level) {
     val c = when (level) {
@@ -77,9 +83,14 @@ fun StatusDot(level: EngineState.Level) {
     Box(Modifier.size(12.dp).background(c, CircleShape))
 }
 
+/** Huella en grupos de 4 caracteres, 8 grupos por línea, para compararla a simple vista. */
 private fun groupHex(h: String) = h.chunked(4).chunked(8).joinToString("\n") { it.joinToString(" ") }
 
 // ---------------------------------------------------------------- Estado
+/**
+ * Pantalla Estado: botón para iniciar o detener, contadores, estado de cada sensor, última lectura en claro,
+ * último sobre transmitido y bitácora.
+ */
 @Composable
 fun StatusScreen(state: EngineState, ready: Boolean, onStart: () -> Unit, onStop: () -> Unit, onClearQueue: () -> Unit) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -112,6 +123,11 @@ fun StatusScreen(state: EngineState, ready: Boolean, onStart: () -> Unit, onStop
 }
 
 // ---------------------------------------------------------------- Configurar
+/**
+ * Pantalla Configurar: vinculación por QR (recomendada) y, como alternativa manual, la URL del servidor, el fijado de
+ * la huella y el registro con usuario y contraseña o con un código.
+ * @param onScanQr Abre el lector de QR con el nombre de dispositivo escrito.
+ */
 @Composable
 fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit) {
     var url by remember(setup.serverUrl) { mutableStateOf(setup.serverUrl) }
@@ -134,12 +150,14 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
         Section("1 · Servidor") {
             OutlinedTextField(url, { url = it }, label = { Text("URL del servidor") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+            // Advertencia si la URL no usa TLS.
             if (url.startsWith("http://")) Text("HTTP sin TLS: los paquetes van cifrados de extremo a extremo, pero el token del dispositivo viaja en claro. Usa HTTPS: el QR de vinculación ya apunta al puerto HTTPS del servidor y fija su certificado.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
             Button(onClick = { vm.setServerUrl(url); vm.fetchKey() }, enabled = !setup.busy) { Text("Obtener llave del servidor") }
             setup.fetchedKey?.let { key ->
                 Text("Huella SHA-256 (compárala con la que imprime el servidor):", style = MaterialTheme.typography.bodySmall)
                 Mono(groupHex(key.fingerprint))
+                // Para fijar hay que marcar antes que la huella coincide.
                 if (setup.pinnedFingerprint != key.fingerprint) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(confirmed, { confirmed = it }); Text("La huella coincide")
@@ -159,6 +177,7 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
                 OutlinedTextField(user, { user = it }, label = { Text("Usuario") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(pass, { pass = it }, label = { Text("Contraseña") }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+                // Al registrar se borra la contraseña del campo.
                 Button(onClick = { vm.register(user, pass, name); pass = "" }, enabled = !setup.busy && user.isNotBlank() && pass.isNotBlank()) { Text("Registrar") }
                 HorizontalDivider()
                 Text("O con el código de vinculación del dashboard:", style = MaterialTheme.typography.bodySmall)
@@ -170,6 +189,11 @@ fun SetupScreen(vm: AppViewModel, setup: SetupState, onScanQr: (String) -> Unit)
 }
 
 // ---------------------------------------------------------------- Ajustes
+/**
+ * Pantalla Ajustes: intervalo de muestreo, sensores expuestos (los que el teléfono no tiene aparecen deshabilitados),
+ * suite AEAD y acceso a la optimización de batería.
+ * @param running Si la telemetría está en marcha (los cambios se aplican al reiniciarla).
+ */
 @Composable
 fun SettingsScreen(settings: Settings, running: Boolean) {
     val ctx = LocalContext.current
@@ -177,6 +201,7 @@ fun SettingsScreen(settings: Settings, running: Boolean) {
     var suite by remember { mutableStateOf(settings.suite) }
     val available = remember { SensorBankCollector.availability(ctx) }
     val sources = remember { Settings.SOURCES.associate { it.id to mutableStateOf(settings.source(it.id)) } }
+    /** Enciende o apaga todos los sensores. */
     fun setAll(on: Boolean) = Settings.SOURCES.forEach { sources[it.id]!!.value = on; settings.setSource(it.id, on) }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (running) Card { Text("Los cambios se aplican al reiniciar la telemetría.", Modifier.padding(12.dp)) }
@@ -190,6 +215,7 @@ fun SettingsScreen(settings: Settings, running: Boolean) {
                 OutlinedButton(onClick = { setAll(true) }) { Text("Todos") }
                 OutlinedButton(onClick = { setAll(false) }) { Text("Ninguno") }
             }
+            // Un interruptor por sensor, agrupados por categoría.
             Settings.SOURCES.groupBy { it.group }.forEach { (group, items) ->
                 Text(group.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp))
@@ -208,6 +234,7 @@ fun SettingsScreen(settings: Settings, running: Boolean) {
                 style = MaterialTheme.typography.bodySmall)
         }
         Section("Cifrado autenticado") {
+            // ChaCha20-Poly1305 solo se ofrece si este Android la implementa.
             listOf(Protocol.SUITE_AES to "AES-256-GCM", Protocol.SUITE_CHACHA to "ChaCha20-Poly1305").forEach { (id, label) ->
                 val enabled = id == Protocol.SUITE_AES || Protocol.chachaSupported()
                 Row(verticalAlignment = Alignment.CenterVertically) {

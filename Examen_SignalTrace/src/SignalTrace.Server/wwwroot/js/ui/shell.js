@@ -1,8 +1,11 @@
-// Shared page chrome: auth guard, top bar, theme switch (auto / light / dark) and service worker.
+// Estructura común de las páginas: protección por sesión, barra superior, selector de tema (auto / claro / oscuro)
+// y registro del service worker.
 import { api, getAuth, logout, store, esc, toast } from "../api.js";
 
+/** Logo de la barra superior. */
 export const LOGO = `<img src="icons/icon-192.png" alt="" width="30" height="30">`;
 
+/** Páginas del menú; las marcadas con admin solo las ve un administrador. */
 const PAGES = [
   { href: "app.html", label: "Dashboard" },
   { href: "agent.html", label: "Agente" },
@@ -11,15 +14,24 @@ const PAGES = [
   { href: "admin.html", label: "Usuarios", admin: true },
 ];
 
+/**
+ * Aplica el tema guardado (o el indicado) y avisa con el evento "st-theme" para que las gráficas cambien de color.
+ * @param {"auto"|"light"|"dark"} [t] Tema; "auto" sigue la preferencia del sistema.
+ */
 export function applyTheme(t = store.read("st.theme") || "auto") {
   if (t === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
   dispatchEvent(new CustomEvent("st-theme"));
 }
+// Si el sistema cambia entre claro y oscuro, las gráficas también se recolorean.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => dispatchEvent(new CustomEvent("st-theme")));
 applyTheme();
 
-/** Redirects to the login when there is no valid session (or the role is insufficient). Returns the session. */
+/**
+ * Redirige al inicio de sesión cuando no hay una sesión válida (o el rol no alcanza). Devuelve la sesión.
+ * Lanza una excepción después de redirigir para detener el resto del script de la página.
+ * @param {{admin?: boolean}} [opts] Si admin es true, exige el rol de administrador.
+ */
 export function requireAuth({ admin = false } = {}) {
   const auth = getAuth();
   if (!auth) { location.replace("index.html?next=" + encodeURIComponent(location.pathname.split("/").pop())); throw new Error("no session"); }
@@ -28,8 +40,10 @@ export function requireAuth({ admin = false } = {}) {
 }
 
 /**
- * Top bar. On phones (< 760 px) the navigation collapses into a hamburger panel.
- * minimal: only brand and theme (a phone linked by QR has no user session).
+ * Barra superior. En teléfonos (< 760 px) la navegación se pliega en un panel con botón de hamburguesa.
+ * minimal: solo la marca y el tema (un teléfono vinculado por QR no tiene sesión de usuario).
+ * @param {string} active Página actual, para marcarla en el menú.
+ * @param {{minimal?: boolean}} [opts]
  */
 export function renderShell(active, { minimal = false } = {}) {
   const auth = minimal ? null : getAuth();
@@ -48,15 +62,17 @@ export function renderShell(active, { minimal = false } = {}) {
         <div class="menu"><button type="button" id="pw-open">Cambiar contraseña</button><button type="button" id="logout">Salir</button></div></details>` : ""}
     </nav>`;
   document.body.prepend(bar);
+  // Selector de tema: guarda la elección del usuario.
   const sel = bar.querySelector("#theme");
   sel.value = store.read("st.theme") || "auto";
   sel.onchange = () => { store.write("st.theme", sel.value); applyTheme(sel.value); };
   bar.querySelector("#logout")?.addEventListener("click", () => logout());
   bar.querySelector("#pw-open")?.addEventListener("click", () => { closeMenus(); changePasswordDialog(); });
 
-  // Hamburger panel (phones) and user dropdown: close on Escape, on a link, or on a click outside.
+  // Panel de hamburguesa (teléfonos) y menú desplegable del usuario: se cierran con Escape, al elegir un enlace o al pulsar fuera.
   const toggle = bar.querySelector(".nav-toggle");
   const userMenu = bar.querySelector(".user-menu");
+  /** Cierra el panel de navegación y el menú del usuario. */
   function closeMenus() {
     bar.classList.remove("nav-open");
     toggle?.setAttribute("aria-expanded", "false");
@@ -75,7 +91,7 @@ export function renderShell(active, { minimal = false } = {}) {
   registerServiceWorker();
 }
 
-/** Any user changes their own password; the server verifies the current one first. */
+/** Diálogo para que cualquier usuario cambie su propia contraseña; el servidor verifica primero la actual. */
 function changePasswordDialog() {
   const dlg = document.createElement("dialog");
   dlg.className = "modal";
@@ -92,6 +108,7 @@ function changePasswordDialog() {
   document.body.append(dlg);
   const q = (id) => dlg.querySelector(id);
   q("#pw-cancel").onclick = () => dlg.close();
+  // El diálogo se elimina del documento al cerrarse.
   dlg.addEventListener("close", () => dlg.remove());
   q("#pw-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -108,6 +125,7 @@ function changePasswordDialog() {
   q("#pw-cur").focus();
 }
 
+/** Registra el service worker (solo en contextos seguros, donde el navegador lo permite). */
 export function registerServiceWorker() {
   if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
 }

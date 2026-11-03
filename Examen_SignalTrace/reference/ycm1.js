@@ -1,4 +1,7 @@
-// YCM1 reference (ES module). Educational cipher: ALWAYS wrap with AES-GCM.
+// Implementación de referencia de YCM1 (módulo ES), escrita de forma independiente para verificar los vectores de prueba.
+// Cifrado didáctico: SIEMPRE debe ir envuelto en AES-GCM.
+
+/** Deriva semilla y parámetros de cada ronda: h = SHA-256(k_sig ‖ u64be(seq) ‖ "YCM1"). */
 export async function deriveParams(kSig, seq, rounds = 3) {
   const buf = new Uint8Array(kSig.length + 8 + 4);
   buf.set(kSig, 0);
@@ -9,11 +12,16 @@ export async function deriveParams(kSig, seq, rounds = 3) {
   for (let i = 0; i < rounds; i++) prm.push({ k: h[1 + 3 * i], m: h[2 + 3 * i], rot: h[3 + 3 * i] });
   return { seed: h[0], prm };
 }
+/** Relleno con bloque de 2: agrega n bytes de valor n (1 o 2). */
 const pad = (d) => { const n = 2 - (d.length % 2); const o = new Uint8Array(d.length + n); o.set(d); o.fill(n, d.length); return o; };
+/** Quita y valida el relleno. */
 const unpad = (p) => { const n = p[p.length - 1]; if (n !== 1 && n !== 2) throw new Error("bad padding");
   for (let i = p.length - n; i < p.length; i++) if (p[i] !== n) throw new Error("bad padding"); return p.slice(0, p.length - n); };
+/** Rotación circular a la izquierda. */
 const rotl = (p, r) => { r %= p.length; return Uint8Array.from([...p.slice(r), ...p.slice(0, r)]); };
+/** Rotación circular a la derecha. */
 const rotr = (p, r) => { r %= p.length; return r ? Uint8Array.from([...p.slice(p.length - r), ...p.slice(0, p.length - r)]) : p.slice(); };
+/** Cifra: por ronda, flujo LCG s ← (5s+3) mod 256, matriz [[1,k],[m,1+k·m]] por pares y rotación a la izquierda. */
 export async function encrypt(plain, kSig, seq, rounds = 3) {
   const { seed, prm } = await deriveParams(kSig, seq, rounds);
   let p = pad(plain); const n = p.length; let s = seed;
@@ -26,6 +34,7 @@ export async function encrypt(plain, kSig, seq, rounds = 3) {
   }
   return p;
 }
+/** Descifra: genera todo el flujo y deshace las rondas de la última a la primera con la matriz inversa. */
 export async function decrypt(ct, kSig, seq, rounds = 3) {
   const { seed, prm } = await deriveParams(kSig, seq, rounds);
   const n = ct.length; let s = seed; const stream = [];

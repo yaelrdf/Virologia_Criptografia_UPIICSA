@@ -21,14 +21,18 @@ import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.AEADBadTagException
 
-/** Appendix A vectors: the Kotlin port must produce exactly the same bytes as C# and Web Crypto. */
+/** Vectores del Apéndice A: la versión en Kotlin debe producir exactamente los mismos bytes que C# y Web Crypto. */
 class VectorTest {
+    /** Vectores leídos de la ruta que pasa Gradle en la propiedad st.vectors. */
     private val v: JsonObject = Json.parseToJsonElement(File(System.getProperty("st.vectors")!!).readText()).jsonObject
     private val hs = v["handshake"]!!.jsonObject
     private val pk = v["packet"]!!.jsonObject
+    /** Campo de texto de un objeto JSON. */
     private fun JsonObject.s(k: String) = this[k]!!.jsonPrimitive.content
+    /** Salida esperada del HKDF por etiqueta. */
     private fun out(label: String) = hs["hkdf"]!!.jsonObject["outputs"]!!.jsonObject.s(label)
 
+    /** El secreto ECDH coincide calculado desde los dos lados. */
     @Test fun ecdhSharedSecret() {
         val priv = Protocol.privateKeyFromScalar(unhex(hs.s("client_ephemeral_private")))
         assertEquals(hs.s("shared_secret_x"), hex(Protocol.sharedSecret(priv, unhex(hs.s("server_ephemeral_public")))))
@@ -36,6 +40,7 @@ class VectorTest {
         assertEquals(hs.s("shared_secret_x"), hex(Protocol.sharedSecret(priv2, unhex(hs.s("client_ephemeral_public")))))
     }
 
+    /** El HKDF escrito a mano da las tres llaves del vector. */
     @Test fun hkdfOutputs() {
         val k = Protocol.deriveKeys(unhex(hs.s("shared_secret_x")), unhex(hs.s("client_nonce")), unhex(hs.s("server_nonce")))
         assertEquals(out("st1/aes-up(32)"), hex(k.kAead))
@@ -43,6 +48,7 @@ class VectorTest {
         assertEquals(out("st1/iv-up(4)"), hex(k.ivSalt))
     }
 
+    /** El transcript coincide, la firma verifica y deja de verificar si cambia un byte. */
     @Test fun transcriptAndSignature() {
         val t = Protocol.transcript(unhex(hs.s("client_ephemeral_public")), unhex(hs.s("server_ephemeral_public")),
             unhex(hs.s("client_nonce")), unhex(hs.s("server_nonce")), hs.s("device_id"), hs.s("session_id"))
@@ -53,6 +59,7 @@ class VectorTest {
         assertFalse(Protocol.verifySignature(unhex(hs.s("server_longterm_public")), t, sig))
     }
 
+    /** El ejemplo de una ronda calculado a mano: «Hi» → (236, 198). */
     @Test fun ycm1WorkedExample() {
         val ex = v["ycm1_round_example"]!!.jsonObject
         val stages = mutableMapOf<String, List<Int>>()
@@ -63,6 +70,7 @@ class VectorTest {
         assertEquals(listOf(236, 198), c.map { it.toInt() and 0xFF })
     }
 
+    /** Parámetros, cada etapa y salida de YCM1 del paquete de ejemplo. */
     @Test fun ycm1PacketStages() {
         val kSig = unhex(out("st1/ycm1(32)"))
         val seq = pk["seq"]!!.jsonPrimitive.long
@@ -80,6 +88,7 @@ class VectorTest {
         assertEquals(pk.s("plaintext_hex"), hex(YaelCryptoMarch1.decrypt(sm, kSig, seq)))
     }
 
+    /** Nonce, AAD y paquete AES-GCM coinciden con el vector; un bit cambiado hace fallar la apertura. */
     @Test fun packetSealMatchesAesGcmVector() {
         val keys = Protocol.deriveKeys(unhex(hs.s("shared_secret_x")), unhex(hs.s("client_nonce")), unhex(hs.s("server_nonce")))
         val seq = pk["seq"]!!.jsonPrimitive.long
@@ -95,6 +104,7 @@ class VectorTest {
         try { Protocol.open(keys, hs.s("device_id"), seq, ts, ct); throw AssertionError("tampered packet accepted") } catch (_: AEADBadTagException) { }
     }
 
+    /** Ida y vuelta de YCM1 para longitudes de 0 a 199 con datos aleatorios. */
     @Test fun ycm1RoundTripAllLengths() {
         val rnd = SecureRandom()
         for (len in 0 until 200) {
@@ -104,6 +114,7 @@ class VectorTest {
         }
     }
 
+    /** Ida y vuelta con ChaCha20-Poly1305, si la JVM la soporta. */
     @Test fun chachaRoundTrip() {
         if (!Protocol.chachaSupported()) return
         val keys = Protocol.deriveKeys(Protocol.randomBytes(32), Protocol.randomBytes(16), Protocol.randomBytes(16), Protocol.SUITE_CHACHA)
@@ -111,8 +122,9 @@ class VectorTest {
         assertEquals("{\"t\":1000,\"src\":\"android\"}", String(Protocol.open(keys, "d", 3, 1000, ct)))
     }
 
+    /** Conversión de firma P1363 a DER. */
     @Test fun derConversion() {
-        // r with the high bit set needs a leading 0x00 in DER.
+        // Una r con el bit alto encendido necesita un 0x00 al inicio en DER.
         val sig = ByteArray(64) { if (it == 0) 0x80.toByte() else 1 }
         val der = Protocol.p1363ToDer(sig)
         assertEquals(0x30, der[0].toInt())

@@ -1,8 +1,9 @@
-"""Regenerates test-vectors.json from fixed inputs (private keys, nonces, ids, plaintext).
+"""Regenera test-vectors.json a partir de entradas fijas (llaves privadas, nonces, identificadores y texto claro).
 
-Every value is recomputed with Python `cryptography` (OpenSSL) and ycm1.py, so the C#, JavaScript and Kotlin
-implementations are checked against an independent source. verify.mjs re-checks the result with Web Crypto.
-    python3 reference/gen_vectors.py [out.json]
+Cada valor se recalcula con la biblioteca `cryptography` de Python (OpenSSL) y con ycm1.py, así las implementaciones
+en C#, JavaScript y Kotlin se comprueban contra una fuente independiente. verify.mjs vuelve a comprobar el resultado
+con Web Crypto.
+    python3 reference/gen_vectors.py [salida.json]
 """
 import base64, hashlib, json, struct, sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 import ycm1
 
+# Entradas fijas: con ellas los vectores son reproducibles (salvo la firma ECDSA, que es aleatoria).
 CLIENT_NONCE = bytes(range(0x00, 0x10))
 SERVER_NONCE = bytes(range(0x10, 0x20))
 DEVICE_ID = "6f1c2a3e-8b4d-4c5e-9a7f-0123456789ab"
@@ -24,18 +26,23 @@ PLAINTEXT = ('{"t":1760000000000,"src":"web","mot":{"ax":0.12,"ay":-0.03,"az":9.
 
 
 def key(byte: int):
+    """Llave privada P-256 cuyo escalar son 32 bytes iguales a `byte` (por ejemplo 0x11…11)."""
     return ec.derive_private_key(int.from_bytes(bytes([byte]) * 32, "big"), ec.SECP256R1())
 
 
 def pub(k) -> bytes:
+    """Llave pública como punto X9.62 sin comprimir de 65 bytes."""
     return k.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
 
 
 def hkdf(ikm: bytes, salt: bytes, info: str, n: int) -> bytes:
+    """HKDF-SHA256 de n bytes con la etiqueta info."""
     return HKDF(hashes.SHA256(), n, salt, info.encode()).derive(ikm)
 
 
 def main(out: Path):
+    """Calcula todos los valores del protocolo y escribe el JSON de vectores."""
+    # Handshake: ECDH entre las llaves efímeras, HKDF y firma del transcript con la llave de largo plazo.
     c_eph, s_eph, s_lt = key(0x11), key(0x22), key(0x33)
     z = c_eph.exchange(ec.ECDH(), s_eph.public_key())
     assert z == s_eph.exchange(ec.ECDH(), c_eph.public_key())
@@ -43,9 +50,11 @@ def main(out: Path):
     k_aes, k_sig, iv = hkdf(z, salt, "st1/aes-up", 32), hkdf(z, salt, "st1/ycm1", 32), hkdf(z, salt, "st1/iv-up", 4)
     transcript = (b"ST1-HS" + pub(c_eph) + pub(s_eph) + CLIENT_NONCE + SERVER_NONCE
                   + DEVICE_ID.encode() + SESSION_ID.encode())
+    # La firma DER se convierte a formato P1363 (r ‖ s, 32 bytes cada uno).
     r, s = decode_dss_signature(s_lt.sign(transcript, ec.ECDSA(hashes.SHA256())))
     sig = r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
+    # Paquete: YCM1 con traza de etapas y después AES-256-GCM.
     plain = PLAINTEXT.encode()
     trace = []
     sm = ycm1.encrypt(plain, k_sig, SEQ, trace=trace)

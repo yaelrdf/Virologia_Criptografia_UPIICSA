@@ -5,9 +5,10 @@ using System.Text.Json;
 
 namespace SignalTrace.Server.Tests;
 
-/// <summary>Dashboard data endpoints: interpolated grid, sensor-bank columns and CSV export.</summary>
+/// <summary>Endpoints de datos del tablero: rejilla interpolada, columnas del banco de sensores y exportación a CSV.</summary>
 public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
 {
+    /// <summary>Hace un GET autenticado, exige 200 y devuelve el JSON.</summary>
     private static async Task<JsonElement> Get(HttpClient http, string token, string url)
     {
         var req = new HttpRequestMessage(HttpMethod.Get, url);
@@ -17,6 +18,7 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         return await res.Content.ReadFromJsonAsync<JsonElement>();
     }
 
+    /// <summary>Una pausa corta se rellena con puntos interpolados (exactos sobre la recta) y una larga queda como hueco.</summary>
     [Fact]
     public async Task Grid_FlagsInterpolatedPoints_AndLeavesLongGaps()
     {
@@ -25,7 +27,7 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var dev = await TestDevice.Create(http, admin);
         await dev.Handshake();
         var t0 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 60_000;
-        // RSSI = −50 − t/1000 at t = 0, 1, 2, 5 s (3 s pause → interpolated) and 20 s (15 s pause → gap).
+        // RSSI = −50 − t/1000 en t = 0, 1, 2, 5 s (pausa de 3 s → interpolada) y 20 s (pausa de 15 s → hueco).
         foreach (var s in new[] { 0, 1, 2, 5, 20 })
         {
             var ts = t0 + s * 1000;
@@ -34,14 +36,15 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         }
         var g = await Get(http, admin, $"/api/readings/grid?deviceId={dev.DeviceId}&field=rssi&stepMs=1000");
         var pts = g.GetProperty("points").EnumerateArray().ToArray();
-        Assert.Equal(-53, pts[3].GetProperty("v").GetDouble(), 6);      // exact on the line
+        Assert.Equal(-53, pts[3].GetProperty("v").GetDouble(), 6);      // exacto sobre la recta
         Assert.True(pts[3].GetProperty("interpolated").GetBoolean());
         Assert.False(pts[5].GetProperty("interpolated").GetBoolean());
-        Assert.False(pts[10].TryGetProperty("v", out _)); // inside the 15 s gap: no value (nulls are omitted)
+        Assert.False(pts[10].TryGetProperty("v", out _)); // dentro del hueco de 15 s: sin valor (los nulos se omiten)
         Assert.Equal(2, g.GetProperty("interpolatedCount").GetInt32());
         Assert.True(g.GetProperty("gapCount").GetInt32() > 0);
     }
 
+    /// <summary>El historial trae las puntuaciones z móviles, y al reducir puntos se conserva la anomalía.</summary>
     [Fact]
     public async Task History_Carries_RollingZScores()
     {
@@ -50,7 +53,7 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var dev = await TestDevice.Create(http, admin);
         await dev.Handshake();
         var t0 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 60_000;
-        // 12 readings around −60 dBm, then a −100 dBm drop: |z| > 3 against the previous window.
+        // 12 lecturas alrededor de −60 dBm y después una caída a −100 dBm: |z| > 3 contra la ventana anterior.
         for (var i = 0; i < 13; i++)
         {
             var rssi = i < 12 ? -60 - i % 2 : -100;
@@ -59,9 +62,13 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var rows = await Get(http, admin, $"/api/readings?deviceId={dev.DeviceId}&maxPoints=5");
         var last = rows.EnumerateArray().Last();
         Assert.True(last.GetProperty("z").GetProperty("rssi").GetDouble() < -3);
-        Assert.True(rows.GetArrayLength() <= 6); // decimated, but the anomaly is kept
+        Assert.True(rows.GetArrayLength() <= 6); // reducido, pero la anomalía se conserva
     }
 
+    /// <summary>
+    /// Los sensores llegan a sus columnas y al JSON completo, un valor fuera de rango se rechaza con 422 y el CSV
+    /// tiene el encabezado esperado sin columnas de ubicación.
+    /// </summary>
     [Fact]
     public async Task SensorBank_Columns_And_CsvExport()
     {
@@ -71,6 +78,7 @@ public class DataTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         await dev.Handshake();
         const string sensors = ",\"gyr\":{\"x\":0.3,\"y\":0,\"z\":0.4},\"mfl\":{\"x\":20,\"y\":-5,\"z\":-40},\"env\":{\"lux\":150,\"prx\":5,\"hpa\":780.5,\"tmp\":24,\"hum\":40},\"stp\":{\"n\":12},\"wifi\":{\"rssi\":-61,\"tx\":433,\"rx\":390}";
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\"" + sensors + "}"))).StatusCode);
+        // Humedad del 140 %: imposible, se rechaza.
         var bad = dev.Seal("{\"t\":$T,\"src\":\"sim\",\"env\":{\"hum\":140}}");
         Assert.Equal((HttpStatusCode)422, (await dev.Send(bad)).StatusCode);
 

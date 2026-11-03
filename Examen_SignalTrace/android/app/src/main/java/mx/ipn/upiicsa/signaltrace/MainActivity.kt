@@ -38,19 +38,27 @@ import mx.ipn.upiicsa.signaltrace.ui.SettingsScreen
 import mx.ipn.upiicsa.signaltrace.ui.SetupScreen
 import mx.ipn.upiicsa.signaltrace.ui.StatusScreen
 
+/**
+ * Única actividad de la aplicación. Dibuja con Jetpack Compose tres pestañas (Estado, Configurar y Ajustes),
+ * lanza el lector de QR y pide los permisos antes de iniciar el servicio de telemetría.
+ */
 class MainActivity : ComponentActivity() {
+    /** Estado de la configuración (servidor, huella, registro del dispositivo). */
     private val vm: AppViewModel by viewModels()
+    /** Nombre del dispositivo escrito antes de abrir el lector de QR. */
     private var pendingQrName = ""
 
-    // Runtime permissions: each denied permission only disables its sensor; the service starts anyway. No location.
+    // Permisos en tiempo de ejecución: cada permiso negado solo desactiva su sensor; el servicio arranca de todos modos. Sin ubicación.
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         TelemetryService.start(this)
     }
 
+    /** Lector de QR (ZXing); el contenido leído se pasa al ViewModel para vincular el teléfono. */
     private val scanner = registerForActivityResult(ScanContract()) { result ->
         result.contents?.let { vm.applyQr(it, pendingQrName) }
     }
 
+    /** Crea la interfaz: tema claro u oscuro según el sistema, barra inferior de navegación y la pantalla de la pestaña activa. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -59,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 darkColorScheme(primary = Color(0xFF4EA1F3), secondary = Color(0xFF1B998B), tertiary = Color(0xFFD29922))
             else lightColorScheme(primary = Color(0xFF0F6CBD), secondary = Color(0xFF1B998B), tertiary = Color(0xFF9A6700))
             MaterialTheme(colorScheme = scheme) {
+                // Si todavía no está configurado, abre directamente en la pestaña Configurar.
                 var tab by rememberSaveable { mutableIntStateOf(if (vm.settings.isRegistered && vm.settings.isPinned) 0 else 1) }
                 val engine by TelemetryEngine.state.collectAsStateWithLifecycle()
                 val setup by vm.setup.collectAsStateWithLifecycle()
@@ -87,7 +96,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Started only from the visible UI (Android 12+ forbids starting foreground services from the background). */
+    /**
+     * Inicia la telemetría. Solo se llama desde la interfaz visible (Android 12+ prohíbe iniciar servicios en primer
+     * plano desde segundo plano). Pide antes el permiso del podómetro (Android 10+) y el de notificaciones (Android 13+).
+     */
     private fun startTelemetry() {
         val wanted = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 29 && vm.settings.source("stp")) wanted += Manifest.permission.ACTIVITY_RECOGNITION

@@ -1,20 +1,27 @@
-// Chart.js helpers (global Chart from lib/chart/chart.umd.min.js). Linear x axis in epoch ms formatted as time,
-// so no date adapter is needed. Colors follow the page theme and are re-applied on "st-theme".
+// Ayudas de Chart.js (la variable global Chart viene de lib/chart/chart.umd.min.js). El eje x es lineal en ms Unix y
+// se formatea como hora, así no hace falta un adaptador de fechas. Los colores siguen el tema de la página y se
+// vuelven a aplicar con el evento "st-theme".
+/** Todas las gráficas creadas, para recolorearlas y destruirlas juntas. */
 const charts = new Set();
 
+/** Paleta de colores de las series. */
 export const SERIES = { blue: "#2f7fd8", orange: "#e8833a", green: "#2ea043", purple: "#8957e5", red: "#e5534b", teal: "#1b998b" };
 
+/** Lee una variable CSS del documento. */
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
+/** Colores del texto y de la cuadrícula según el tema actual. */
 function themeOptions() {
   const text = css("--muted"), grid = css("--border");
   return { text, grid };
 }
 
+/** Formatea un instante (ms) como hora de 24 h para las marcas del eje x. */
 const timeTick = (v) => new Date(v).toLocaleTimeString("es-MX", { hour12: false });
+/** Si la pantalla mide menos de 480 px de ancho. */
 const narrow = () => matchMedia("(max-width: 479px)").matches;
 
-/** Phone-sized charts: fewer ticks, smaller legend, no axis titles. Re-applied when the width changes. */
+/** Gráficas a tamaño de teléfono: menos marcas, leyenda más pequeña y sin títulos de eje. Se vuelve a aplicar cuando cambia el ancho. */
 function fit(chart) {
   const n = narrow();
   const x = chart.options.scales.x, y = chart.options.scales.y;
@@ -27,8 +34,12 @@ function fit(chart) {
 }
 
 /**
- * Line chart over time. datasets: [{ label, color, dashed?, fill?, marks? }]; marks draws only points (no line),
- * used for the z-score anomalies. max: points kept per dataset by push().
+ * Gráfica de líneas en el tiempo. datasets: [{ label, color, dashed?, fill?, marks? }]; marks dibuja solo puntos
+ * (sin línea) y se usa para las anomalías por puntuación z. max: puntos que conserva push() por serie.
+ * @param {HTMLCanvasElement} canvas Lienzo donde se dibuja.
+ * @param {object[]} datasets Series.
+ * @param {{yLabel?: string, yMin?: number, yMax?: number, legend?: boolean, max?: number}} [opts]
+ * @returns {Chart} La gráfica creada.
  */
 export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = true, max = 300 } = {}) {
   const { text, grid } = themeOptions();
@@ -43,6 +54,7 @@ export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = 
       })),
     },
     options: {
+      // Sin animaciones: los datos en vivo llegan cada segundo.
       animation: false, responsive: true, maintainAspectRatio: false, interaction: { mode: "nearest", intersect: false },
       scales: {
         x: { type: "linear", ticks: { color: text, maxTicksLimit: 6, callback: timeTick }, grid: { color: grid } },
@@ -62,7 +74,13 @@ export function timeChart(canvas, datasets, { yLabel = "", yMin, yMax, legend = 
   return chart;
 }
 
-/** Bar/line chart over a numeric x axis (spectrum in Hz). */
+/**
+ * Gráfica de barras sobre un eje x numérico (espectro en Hz).
+ * @param {HTMLCanvasElement} canvas Lienzo.
+ * @param {string} label Nombre de la serie.
+ * @param {string} color Color de las barras.
+ * @param {{xLabel?: string, yLabel?: string}} [opts] Títulos de los ejes.
+ */
 export function xyChart(canvas, label, color, { xLabel = "", yLabel = "" } = {}) {
   const { text, grid } = themeOptions();
   const chart = new Chart(canvas, {
@@ -84,7 +102,10 @@ export function xyChart(canvas, label, color, { xLabel = "", yLabel = "" } = {})
   return chart;
 }
 
-/** Appends a point to dataset i, keeping at most max points (the chart's own limit by default). */
+/**
+ * Agrega un punto a la serie i y conserva como máximo max puntos (por defecto, el límite propio de la gráfica).
+ * Los valores nulos o NaN se ignoran. No redibuja: quien llama decide cuándo hacer update().
+ */
 export function push(chart, i, x, y, max = chart.$max ?? 300) {
   if (y == null || Number.isNaN(y)) return;
   const d = chart.data.datasets[i].data;
@@ -92,12 +113,16 @@ export function push(chart, i, x, y, max = chart.$max ?? 300) {
   if (d.length > max) d.splice(0, d.length - max);
 }
 
+/** Vacía todas las series de una gráfica. */
 export function clear(chart) { chart.data.datasets.forEach((d) => (d.data = [])); chart.update(); }
 
+/** Destruye todas las gráficas (al cambiar de dispositivo en el tablero). */
 export function destroyAll() { charts.forEach((c) => c.destroy()); charts.clear(); }
 
+// Al cruzar el ancho de 480 px, se ajustan las opciones de todas las gráficas.
 matchMedia("(max-width: 479px)").addEventListener("change", () => { for (const c of charts) { fit(c); c.update("none"); } });
 
+// Al cambiar de tema, se recolorean ejes, cuadrícula y leyenda.
 addEventListener("st-theme", () => {
   const { text, grid } = themeOptions();
   for (const c of charts) {

@@ -1,6 +1,6 @@
-// Dashboard (PLAN §11.1): live device list; for the selected device the instantaneous value of every exposed sensor
-// (updated by SignalR) and its history (15 min to 24 h) with SMA/EMA, z-score marks, DFT spectrum, battery trend
-// and the interpolated time grid; CSV export and QR linking.
+// Dashboard (PLAN §11.1): lista de dispositivos en vivo; para el dispositivo seleccionado, el valor instantáneo de
+// cada sensor expuesto (actualizado por SignalR) y su historial (15 min a 24 h) con SMA/EMA, marcas de puntuación z,
+// espectro DFT, tendencia de la batería y la rejilla de tiempo interpolada; exportación a CSV y vinculación por QR.
 import { api, getAuth, store, toast, esc, fmtTime } from "./api.js";
 import { requireAuth, renderShell } from "./ui/shell.js";
 import * as C from "./ui/charts.js";
@@ -8,24 +8,30 @@ import qrcode from "../lib/qrcode/qrcode.mjs";
 
 const auth = requireAuth();
 renderShell("app.html");
+/** Atajo para document.getElementById. */
 const $ = (id) => document.getElementById(id);
 
+/** Máximo de puntos por serie, tanto del historial como en vivo. */
 const MAX_POINTS = 1500;
+/** Estado del tablero. */
 const st = {
-  devices: new Map(),       // id -> device
+  devices: new Map(),       // id → dispositivo
   selected: null,
-  range: store.read("st.dash.range") ?? 15,   // minutes of history
+  range: store.read("st.dash.range") ?? 15,   // minutos de historial
   readings: 0,
-  loading: false,           // while the history loads, live readings wait in `pending` (charts need sorted x)
+  loading: false,           // mientras carga el historial, las lecturas en vivo esperan en `pending` (las gráficas necesitan x ordenado)
   pending: [],
-  spectrum: null,
-  last: null,
+  spectrum: null,           // última frecuencia dominante
+  last: null,               // última lectura
 };
 
+/** Media móvil simple de los últimos w valores. */
 function smaStep(arr, w) { const s = arr.slice(-w); return s.reduce((a, b) => a + b, 0) / s.length; }
 
-// ---------- charts
+// ---------- Gráficas
+/** Opciones comunes de las gráficas de tiempo. */
 const opt = (o = {}) => ({ max: MAX_POINTS, ...o });
+/** Serie de marcas rojas para las anomalías (|z| > 3). */
 const Z = { label: "|z| > 3", color: C.SERIES.red, marks: true };
 const chRssi = C.timeChart($("c-rssi"), [{ label: "RSSI", color: C.SERIES.blue, points: 1.2 }, { label: "EMA", color: C.SERIES.orange, width: 2.2 }, Z], opt({ yLabel: "dBm" }));
 const chRtt = C.timeChart($("c-rtt"), [{ label: "RTT (ms)", color: C.SERIES.purple }, { label: "EMA RTT", color: C.SERIES.orange, width: 2.2 }, { label: "Pérdida (%)", color: C.SERIES.red, dashed: true }, Z], opt({ yLabel: "ms / %" }));
@@ -37,17 +43,22 @@ const chHpa = C.timeChart($("c-hpa"), [{ label: "Presión", color: C.SERIES.teal
 const chBat = C.timeChart($("c-bat"), [{ label: "Batería (%)", color: C.SERIES.green, fill: true }, { label: "Proyección (regresión)", color: C.SERIES.red, dashed: true }], opt({ yLabel: "%", yMin: 0, yMax: 100 }));
 const chSpec = C.xyChart($("c-spec"), "|X(f)|", C.SERIES.teal, { xLabel: "Hz", yLabel: "|X_k| / N" });
 const chGrid = C.timeChart($("c-grid"), [{ label: "Malla regular", color: C.SERIES.blue, points: 2.5 }], { legend: false, max: 5000 });
+/** Gráficas que reciben lecturas en vivo. */
 const LIVE_CHARTS = [chRssi, chRtt, chMot, chGyr, chOri, chLux, chHpa, chBat];
+/** Últimos 10 RMS, para la SMA local. */
 const motWindow = [];
 
+/** Si ya hay un redibujado programado. */
 let pending = false;
+/** Redibuja las gráficas en vivo una sola vez por cuadro, aunque lleguen varias lecturas seguidas. */
 function redraw() {
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => { pending = false; LIVE_CHARTS.forEach((c) => c.update("none")); });
 }
 
-// ---------- device list
+// ---------- Lista de dispositivos
+/** Lista ordenada con los dispositivos en línea primero y luego por nombre. */
 function renderDevices() {
   const list = [...st.devices.values()].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   $("dev-count").textContent = `${list.filter((d) => d.online).length}/${list.length} en línea`;
@@ -59,6 +70,7 @@ function renderDevices() {
 }
 $("devices").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) select(b.dataset.id); });
 
+/** Carga los dispositivos y selecciona el guardado, el primero en línea o el primero de la lista. */
 async function loadDevices() {
   const list = await api("/api/devices");
   st.devices = new Map(list.map((d) => [d.id, d]));
@@ -70,11 +82,18 @@ async function loadDevices() {
   }
 }
 
-// ---------- readings → charts
+// ---------- Lecturas → gráficas
+/**
+ * Agrega una lectura a todas las gráficas que le correspondan. Si el servidor no mandó la EMA (historial), la
+ * calcula aquí con α = 0.3.
+ * @param {object} r Lectura (ReadingDto del servidor).
+ * @param {boolean} [live] Si es en vivo, redibuja y actualiza el panel; en el historial se redibuja al final.
+ */
 function addReading(r, live = true) {
   st.readings++;
   st.last = r;
   const t = r.ts, z = r.z ?? {};
+  // Marca la anomalía en la serie i si |z| > 3.
   const mark = (chart, i, key, y) => { if (Math.abs(z[key] ?? 0) > 3) C.push(chart, i, t, y); };
   const sig = r.wifiRssi ?? r.cellDbm;
   if (sig != null) {
@@ -101,7 +120,7 @@ function addReading(r, live = true) {
   }
   if (r.gyrNorm != null) C.push(chGyr, 0, t, r.gyrNorm);
   if (r.p?.ori) {
-    // Azimuth wraps around 0°/360°: break the line instead of drawing a vertical jump across the chart.
+    // El azimut da la vuelta en 0°/360°: se corta la línea en lugar de dibujar un salto vertical de lado a lado.
     const prevAz = chOri.data.datasets[0].data.at(-1)?.y;
     if (prevAz != null && Math.abs(r.p.ori.az - prevAz) > 180) chOri.data.datasets[0].data.push({ x: t - 1, y: null });
     C.push(chOri, 0, t, r.p.ori.az); C.push(chOri, 1, t, r.p.ori.pi); C.push(chOri, 2, t, r.p.ori.ro);
@@ -115,13 +134,14 @@ function addReading(r, live = true) {
   if (live) {
     redraw();
     renderLive();
+    // Breve destello de la tarjeta para indicar que llegó una lectura.
     const card = $("live-card");
     card.classList.add("pulse");
     setTimeout(() => card.classList.remove("pulse"), 350);
   }
 }
 
-/** Least-squares slope from the server (%/h) projected forward until 0 % or 15 min. */
+/** Proyecta hacia adelante la pendiente por mínimos cuadrados del servidor (%/h) hasta llegar a 0 % o a 15 min. */
 function projectBattery(t, lvl, slopePerHour) {
   const ds = chBat.data.datasets[1];
   if (slopePerHour >= -1e-4) { ds.data = []; $("bat-note").textContent = "estable o cargando"; return; }
@@ -130,22 +150,32 @@ function projectBattery(t, lvl, slopePerHour) {
   $("bat-note").textContent = `pendiente ${(slopePerHour * 100).toFixed(1)} %/h`;
 }
 
-// ---------- live panel: every value of the last reading, grouped
+// ---------- Panel en vivo: todos los valores de la última lectura, agrupados
+/** Número con d decimales, o null si no hay valor. */
 const num = (v, d = 1) => (v == null || Number.isNaN(v) ? null : Number(v).toFixed(d));
+/** Vector como texto "x, y, z". */
 const vec = (v, d = 2) => (v ? `${num(v.x, d)}, ${num(v.y, d)}, ${num(v.z, d)}` : null);
+/** Norma de un vector. */
 const norm = (v) => (v ? Math.hypot(v.x, v.y, v.z) : null);
 const CARDINAL = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+/** Punto cardinal más cercano a un azimut en grados. */
 const cardinal = (deg) => CARDINAL[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
-/** Barometric altitude (international standard atmosphere): h = 44330 · (1 − (p / 1013.25)^0.1903). */
+/** Altitud barométrica (atmósfera estándar internacional): h = 44330 · (1 − (p / 1013.25)^0.1903). */
 const altitude = (hpa) => 44330 * (1 - (hpa / 1013.25) ** 0.1903);
 
+/**
+ * Panel con cada valor de la última lectura agrupado por categoría. Solo muestra los valores presentes y resalta
+ * los que tienen |z| > 3.
+ */
 function renderLive() {
   const r = st.last, d = st.devices.get(st.selected);
   if (!d) return;
   $("d-meta").innerHTML = `${esc(d.kind)} · <span class="badge ${d.online ? "ok" : "off"}">${d.online ? "en línea" : "fuera de línea"}</span> · id <span class="mono">${d.id.slice(0, 8)}…</span>${d.intervalMs ? ` · intervalo ≈ ${(d.intervalMs / 1000).toFixed(1)} s` : ""}`;
   if (!r) { $("live-panel").innerHTML = `<p class="muted">Sin lecturas en el rango elegido.</p>`; return; }
   const p = r.p ?? {}, z = r.z ?? {};
+  // Tiempo restante de batería en minutos u horas.
   const eta = r.batEtaMin != null ? (r.batEtaMin > 120 ? `${(r.batEtaMin / 60).toFixed(1)} h` : `${Math.round(r.batEtaMin)} min`) : null;
+  // Cada grupo: [título, [[valor, etiqueta, z opcional], …]].
   const groups = [
     ["Movimiento", [
       [num(p.mot?.rms, 3), "acelerómetro · RMS m/s²", z.rms], [num(p.mot?.peak, 3), "acelerómetro · pico m/s²"],
@@ -190,12 +220,14 @@ function renderLive() {
   renderAge();
 }
 
+/** Texto «lectura de las HH:MM:SS (hace N s)». */
 function renderAge() {
   if (!st.last) { $("live-age").textContent = ""; return; }
   const s = Math.max(0, Math.round((Date.now() - st.last.ts) / 1000));
   $("live-age").textContent = `· lectura de las ${fmtTime(st.last.ts)} (hace ${s < 90 ? s + " s" : Math.round(s / 60) + " min"})`;
 }
 
+/** Dibuja el espectro que manda el servidor, con la barra de la frecuencia dominante en naranja. */
 function renderSpectrum(freqs, mags, dominant) {
   chSpec.data.labels = freqs.map((f) => f.toFixed(1));
   chSpec.data.datasets[0].data = mags;
@@ -205,11 +237,16 @@ function renderSpectrum(freqs, mags, dominant) {
   $("spec-note").textContent = `pico en ${dominant.toFixed(2)} Hz · resolución ${(freqs[1] ?? 0).toFixed(2)} Hz`;
 }
 
-// ---------- interpolated grid
+// ---------- Rejilla interpolada
+/**
+ * Carga la rejilla regular del campo elegido (hasta 60 min) y la dibuja: puntos medidos en azul e interpolados en
+ * naranja, con el tramo interpolado punteado. Los huecos largos quedan sin línea.
+ */
 async function loadGrid() {
   if (!st.selected) return;
   const field = $("grid-field").value;
   const g = await api(`/api/readings/grid?deviceId=${st.selected}&field=${field}&from=${Date.now() - Math.min(st.range, 60) * 60_000}`);
+  // Batería y pérdida vienen de 0 a 1; se muestran en porcentaje.
   const scale = field === "battery" || field === "loss" ? 100 : 1;
   const pts = g.points.map((p) => ({ x: p.t, y: p.v == null ? null : p.v * scale, i: p.interpolated }));
   const ds = chGrid.data.datasets[0];
@@ -224,7 +261,8 @@ async function loadGrid() {
 }
 $("grid-field").onchange = loadGrid;
 
-// ---------- history
+// ---------- Historial
+/** Marca el botón del rango de tiempo activo. */
 function renderRange() {
   $("range").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.min) === st.range)));
 }
@@ -237,6 +275,10 @@ $("range").addEventListener("click", (e) => {
   loadHistory();
 });
 
+/**
+ * Vacía las gráficas y carga el historial del rango elegido (reducido a MAX_POINTS por el servidor). Las lecturas
+ * en vivo que llegan mientras tanto se guardan y se agregan después, solo si son más nuevas que el historial.
+ */
 async function loadHistory() {
   const id = st.selected;
   st.loading = true; st.pending = [];
@@ -244,6 +286,7 @@ async function loadHistory() {
   [...LIVE_CHARTS, chGrid].forEach(C.clear);
   const from = Date.now() - st.range * 60_000;
   const rows = await api(`/api/readings?deviceId=${id}&from=${from}&limit=100000&maxPoints=${MAX_POINTS}`).finally(() => { st.loading = false; });
+  // Si mientras cargaba se eligió otro dispositivo, se descarta.
   if (id !== st.selected) return;
   rows.forEach((r) => addReading(r, false));
   const lastTs = rows.at(-1)?.ts ?? 0;
@@ -258,7 +301,8 @@ async function loadHistory() {
   loadGrid();
 }
 
-// ---------- selection
+// ---------- Selección
+/** Selecciona un dispositivo: cambia la suscripción de SignalR, limpia el espectro y carga su historial. */
 async function select(id) {
   if (st.selected === id) return;
   if (st.selected && hub.state === "Connected") hub.invoke("Unsubscribe", st.selected).catch(() => {});
@@ -276,7 +320,8 @@ async function select(id) {
   await loadHistory();
 }
 
-// ---------- exports & admin
+// ---------- Exportación y administración
+// Cada botón con data-export descarga el archivo indicado mediante un enlace temporal.
 document.querySelectorAll("[data-export]").forEach((b) => (b.onclick = async () => {
   const res = await api(`/api/export/${b.dataset.export}?deviceId=${st.selected}`, { raw: true });
   if (!res.ok) { toast("No se pudo exportar"); return; }
@@ -285,6 +330,7 @@ document.querySelectorAll("[data-export]").forEach((b) => (b.onclick = async () 
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }));
+// Revocar (solo administradores): invalida el token y borra el dispositivo y sus lecturas.
 $("revoke").onclick = async () => {
   const d = st.devices.get(st.selected);
   if (!confirm(`¿Revocar y borrar "${d?.name}"? Su token deja de servir y se eliminan sus lecturas.`)) return;
@@ -294,10 +340,11 @@ $("revoke").onclick = async () => {
   renderDevices();
 };
 
-// ---------- QR linking: an ordinary URL (phone camera → web agent; the Android app reads the same link)
+// ---------- Vinculación por QR: una URL normal (cámara del teléfono → agente web; la app Android lee el mismo enlace)
 $("qr-btn").onclick = async () => {
   try {
     const e = await api("/api/enroll", { method: "POST" });
+    // QR de tipo 0 (tamaño automático) con corrección de errores nivel M.
     const q = qrcode(0, "M");
     q.addData(e.qr);
     q.make();
@@ -315,12 +362,15 @@ $("qr-copy").onclick = async () => {
 $("qr-close").onclick = () => $("qr-dialog").close();
 
 // ---------- SignalR
+/** Conexión en vivo con el token del usuario y reconexión automática. */
 const hub = new signalR.HubConnectionBuilder()
   .withUrl("/hubs/live", { accessTokenFactory: () => getAuth()?.token ?? "" })
   .withAutomaticReconnect()
   .configureLogging(signalR.LogLevel.Warning)
   .build();
+/** Insignia del estado de la conexión. */
 const setLive = (kind, text) => { $("live").className = "badge " + kind; $("live").textContent = text; };
+// Cambio de estado de un dispositivo; uno nuevo se selecciona si todavía no hay ninguno.
 hub.on("DeviceStatus", (id, s) => {
   const d = st.devices.get(id) ?? { id };
   Object.assign(d, { name: s.name, kind: s.kind, online: s.online, lastSeen: s.lastSeen, battery: s.battery, lastRssi: s.lastRssi });
@@ -329,15 +379,18 @@ hub.on("DeviceStatus", (id, s) => {
   renderDevices();
   if (isNew && !st.selected) select(id);
 });
+// Lectura nueva del dispositivo seleccionado (se aparta si el historial está cargando).
 hub.on("Reading", (id, r) => {
   if (id !== st.selected) return;
   if (st.loading) st.pending.push(r); else addReading(r);
 });
 hub.on("Spectrum", (id, freqs, mags, dominant) => { if (id === st.selected) renderSpectrum(freqs, mags, dominant); });
 hub.onreconnecting(() => setLive("warn", "Reconectando…"));
+// Al reconectar hay que volver a suscribirse, porque los grupos son por conexión.
 hub.onreconnected(() => { setLive("ok", "En vivo"); if (st.selected) hub.invoke("Subscribe", st.selected); });
 hub.onclose(() => setLive("bad", "Sin conexión en vivo"));
 
+/** Conecta el hub; si falla, lo reintenta cada 5 s. */
 async function connect() {
   try {
     await hub.start();
@@ -349,11 +402,11 @@ async function connect() {
   }
 }
 
-// ---------- boot
+// ---------- Arranque
 renderRange();
 await connect();
 await loadDevices();
 setInterval(loadGrid, 15000);
-// Online/offline flags come from the server monitor, but the "last seen" texts must keep ticking.
+// El estado en línea o fuera de línea lo decide el monitor del servidor, pero los textos de «visto por última vez» deben seguir avanzando.
 setInterval(renderDevices, 5000);
 setInterval(renderAge, 1000);

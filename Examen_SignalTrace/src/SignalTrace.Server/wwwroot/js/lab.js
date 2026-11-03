@@ -1,5 +1,5 @@
-// Scenario lab (PLAN §11.3 and §17): each scenario runs in the browser with a real lab device, real handshake and
-// real HTTP requests, and compares what happened with what the protocol promises.
+// Laboratorio de escenarios (PLAN §11.3 y §17): cada escenario corre en el navegador con un dispositivo de
+// laboratorio real, un handshake real y solicitudes HTTP reales, y compara lo que pasó con lo que promete el protocolo.
 import { api, store, esc, toast } from "./api.js";
 import { requireAuth, renderShell } from "./ui/shell.js";
 import * as S from "./crypto/session.js";
@@ -8,16 +8,20 @@ import { encryptWithParams } from "./crypto/ycm1.js";
 
 const auth = requireAuth({ admin: true });
 renderShell("lab.html");
+/** Atajo para document.getElementById. */
 const $ = (id) => document.getElementById(id);
+/** Llave de localStorage del dispositivo de laboratorio de este administrador. */
 const LAB_KEY = "st.lab.device." + auth.username;
 
+/** Llave del servidor, dispositivo de laboratorio y sesión actual. */
 let server = null, device = null, session = null;
 
-// ---------- lab device and helpers
+// ---------- Dispositivo de laboratorio y ayudas
+/** Devuelve el dispositivo de laboratorio; lo registra si no existe o ya no está en el servidor. */
 async function ensureDevice() {
   server ??= await api("/api/server-key");
   if (!device) {
-    // The cached lab device may have been revoked from the dashboard (or the database reset): then register a new one.
+    // El dispositivo guardado pudo haberse revocado desde el dashboard (o se reinició la base de datos): entonces se registra otro.
     const cached = store.read(LAB_KEY);
     if (cached && (await api("/api/devices")).some((d) => d.id === cached.deviceId)) device = cached;
   }
@@ -29,6 +33,10 @@ async function ensureDevice() {
   return device;
 }
 
+/**
+ * Handshake real. Con mitm pide al servidor la firma del intermediario simulado.
+ * @param {{mitm?: boolean, suite?: string}} [opts]
+ */
 async function handshake({ mitm = false, suite = S.SUITE_AES } = {}) {
   const d = await ensureDevice();
   const { state, request } = await S.beginHandshake(d.deviceId, suite);
@@ -38,19 +46,23 @@ async function handshake({ mitm = false, suite = S.SUITE_AES } = {}) {
   return { resp, session };
 }
 
+/** Lectura de ejemplo; extra agrega o reemplaza bloques. */
 const payload = (extra = {}) => ({ t: Date.now(), src: "web", ori: { az: 182.5, pi: -3.1, ro: 1.2 }, env: { lux: 320, hpa: 779.4 }, bat: { lvl: 0.71, chg: false }, ...extra });
 
+/** Envía un sobre (objeto o texto) y devuelve { status, code, message }. */
 async function post(env, token = device.deviceToken) {
   const res = await api("/api/telemetry", { method: "POST", body: typeof env === "string" ? env : JSON.stringify(env), token, raw: true });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, code: res.status === 202 ? "ok" : body.code, message: body.message };
 }
 
+/** Sella una lectura con el siguiente número de secuencia (o con uno dado). */
 async function seal(p, seq = ++session.seq) {
   return S.envelope(session, seq, p.t, p);
 }
 
-// ---------- scenarios: { id, title, what, expect, run(log) → actual }
+// ---------- Escenarios: { id, title, what, expect, run(log) → resultado obtenido }
+// Cada run devuelve un texto que se compara con expect para marcar el escenario como esperado o distinto.
 const SCENARIOS = [
   { id: "normal", title: "Normal", what: "Handshake ECDH firmado, luego una lectura Yael Crypto March1 → AES-GCM.", expect: "202",
     async run(log) {
@@ -72,7 +84,7 @@ const SCENARIOS = [
       log("Quien escucha la red ve did, seq y ts (metadatos autenticados en el AAD) pero no la orientación, la luz, la presión, la batería ni la red.");
       const r = await post(env);
       log(`El servidor lo acepta: ${r.status}`);
-      // Entropy over a longer capture so the estimate is meaningful.
+      // Entropía sobre una captura más larga, para que la estimación tenga sentido (con pocos bytes no puede llegar a 8).
       const caps = [];
       for (let i = 0; i < 8; i++) { const e = await seal(payload()); caps.push(...fromB64(e.ct)); await post(e); }
       const h = entropy(Uint8Array.from(caps));
@@ -156,6 +168,7 @@ const SCENARIOS = [
       log(`Suite acordada: ${resp.suite}`);
       const r = await post(await seal(payload()));
       log(`→ ${r.status}`);
+      // Regresa a AES-GCM para los escenarios siguientes.
       await handshake();
       return String(r.status);
     } },
@@ -179,7 +192,8 @@ const SCENARIOS = [
     } },
 ];
 
-// ---------- UI
+// ---------- Interfaz
+/** Tarjeta HTML de un escenario con su botón y su área de salida. */
 function card(s) {
   return `<section class="card" id="sc-${s.id}">
     <h3>${esc(s.title)} <span class="badge off" id="st-${s.id}">pendiente</span></h3>
@@ -189,11 +203,16 @@ function card(s) {
 }
 $("scenarios").innerHTML = SCENARIOS.map(card).join("");
 
+/**
+ * Ejecuta un escenario, muestra su bitácora y marca si el resultado coincide con el esperado.
+ * @returns {Promise<{s: object, actual: string, pass: boolean}>}
+ */
 async function run(s) {
   const out = $("out-" + s.id);
   out.innerHTML = "";
   const badge = $("st-" + s.id);
   badge.className = "badge info"; badge.textContent = "ejecutando";
+  // Escribe una línea y, si hay datos, un bloque con ellos.
   const log = (msg, data) => {
     out.insertAdjacentHTML("beforeend", `<div class="small" style="margin-top:6px">${esc(msg)}</div>${data != null ? `<pre class="mono hex" style="margin-top:4px;max-height:140px">${esc(data)}</pre>` : ""}`);
   };
@@ -205,11 +224,13 @@ async function run(s) {
   return { s, actual, pass };
 }
 
+// Un solo manejador para todos los botones «Ejecutar».
 document.addEventListener("click", (e) => {
   const id = e.target.dataset?.run;
   if (id) run(SCENARIOS.find((s) => s.id === id));
 });
 
+// «Ejecutar todos»: corre los escenarios en orden y arma la tabla de resumen.
 $("run-all").onclick = async () => {
   $("run-all").disabled = true;
   const rows = [];
@@ -220,6 +241,7 @@ $("run-all").onclick = async () => {
   $("run-all").disabled = false;
 };
 
+// Arranque: muestra la configuración del laboratorio y prepara el dispositivo.
 try {
   const cfg = await api("/api/lab/config");
   $("cfg").innerHTML = Object.entries(cfg).map(([k, v]) => `<dt>${k}</dt><dd>${esc(Array.isArray(v) ? v.join(", ") : String(v))}</dd>`).join("");

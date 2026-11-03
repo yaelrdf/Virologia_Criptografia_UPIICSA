@@ -1,4 +1,5 @@
-// node --test tests/web : the browser crypto modules against reference/test-vectors.json.
+// node --test tests/web : prueba los módulos criptográficos del navegador contra reference/test-vectors.json.
+// Si pasan, el cliente web produce exactamente los mismos bytes que el servidor en C# y la app Android.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -6,10 +7,13 @@ import * as ycm1 from "../../src/SignalTrace.Server/wwwroot/js/crypto/ycm1.js";
 import * as S from "../../src/SignalTrace.Server/wwwroot/js/crypto/session.js";
 import { fromHex, toHex, toB64, utf8, randomBytes, entropy } from "../../src/SignalTrace.Server/wwwroot/js/crypto/util.js";
 
+/** Vectores de prueba compartidos por los tres clientes. */
 const V = JSON.parse(readFileSync(new URL("../../reference/test-vectors.json", import.meta.url)));
 const hs = V.handshake, pk = V.packet;
+/** Salida esperada del HKDF por etiqueta. */
 const out = (l) => hs.hkdf.outputs[l];
 
+// Ejemplo calculado a mano: «Hi» con una ronda, sin rotación ni relleno.
 test("YCM1 worked example (1 round, no rotation, no padding)", () => {
   const ex = V.ycm1_round_example;
   const stages = {};
@@ -19,6 +23,7 @@ test("YCM1 worked example (1 round, no rotation, no padding)", () => {
   assert.deepEqual([...ycm1.decryptWithParams(c, { seed: ex.seed, prm: [{ k: ex.k, m: ex.m, rot: 0 }] }, false)], ex.plain);
 });
 
+// Parámetros, cada etapa intermedia y la salida de YCM1 del paquete de ejemplo.
 test("YCM1 packet params, every stage and output", async () => {
   const kSig = fromHex(out("st1/ycm1(32)"));
   const { seed, prm } = await ycm1.deriveParams(kSig, pk.seq);
@@ -30,6 +35,7 @@ test("YCM1 packet params, every stage and output", async () => {
   assert.equal(toHex(await ycm1.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
 });
 
+// Ida y vuelta para longitudes de 0 a 199 y rechazo de un relleno inválido.
 test("YCM1 round trip for lengths 0..199 and bad padding rejected", async () => {
   for (let len = 0; len < 200; len++) {
     const d = randomBytes(len), k = randomBytes(32);
@@ -39,6 +45,7 @@ test("YCM1 round trip for lengths 0..199 and bad padding rejected", async () => 
   assert.throws(() => ycm1.decryptWithParams(ycm1.encryptWithParams([10, 3], prm, null, false), prm));
 });
 
+// Las tres llaves HKDF y el transcript del handshake.
 test("HKDF outputs and transcript", async () => {
   const keys = await S.deriveKeys(fromHex(hs.shared_secret_x), fromHex(hs.client_nonce), fromHex(hs.server_nonce));
   assert.equal(toHex(keys.kAead), out("st1/aes-up(32)"));
@@ -48,8 +55,9 @@ test("HKDF outputs and transcript", async () => {
   assert.equal(toHex(t), hs.transcript);
 });
 
+// La firma del vector verifica con la llave fijada y se rechaza con cualquier otra llave.
 test("completeHandshake verifies the vector signature and rejects another key", async () => {
-  // Rebuild the client state from the vector's fixed ephemeral key.
+  // Reconstruye el estado del cliente con la llave efímera fija del vector (importada como JWK).
   const p = fromHex(hs.client_ephemeral_public);
   const b64u = (u) => Buffer.from(u).toString("base64url");
   const privateKey = await crypto.subtle.importKey("jwk", { kty: "EC", crv: "P-256", d: b64u(fromHex(hs.client_ephemeral_private)), x: b64u(p.slice(1, 33)), y: b64u(p.slice(33)) }, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
@@ -63,6 +71,7 @@ test("completeHandshake verifies the vector signature and rejects another key", 
   await assert.rejects(S.completeHandshake(state, resp, otherPub), /MITM/);
 });
 
+// El paquete sellado coincide con el vector AES-GCM; un bit cambiado o otra secuencia hacen fallar la apertura.
 test("packet seal matches the AES-GCM vector; bit flip fails", async () => {
   const keys = await S.deriveKeys(fromHex(hs.shared_secret_x), fromHex(hs.client_nonce), fromHex(hs.server_nonce));
   const session = { sid: hs.session_id, did: hs.device_id, keys };
@@ -75,13 +84,16 @@ test("packet seal matches the AES-GCM vector; bit flip fails", async () => {
   await assert.rejects(S.open(session, pk.seq + 1, pk.ts_ms, ct));
 });
 
+// La huella mide 64 caracteres hex y la entropía va de 0 a 8.
 test("fingerprint and entropy", async () => {
   assert.equal((await S.fingerprint(fromHex(hs.server_longterm_public))).length, 64);
   assert.equal(entropy(new Uint8Array(64)), 0);
   assert.ok(Math.abs(entropy(Uint8Array.from({ length: 256 }, (_, i) => i)) - 8) < 1e-9);
 });
 
+/** Copia local de @noble/ciphers; si falta, las pruebas de ChaCha20 se omiten. */
 const chachaPath = new URL("../../src/SignalTrace.Server/wwwroot/lib/noble-ciphers/chacha.js", import.meta.url);
+// Ida y vuelta con la suite ChaCha20-Poly1305 y rechazo de un bit cambiado.
 test("ChaCha20-Poly1305 suite round trip", { skip: !existsSync(chachaPath) && "noble-ciphers not copied yet" }, async () => {
   const keys = await S.deriveKeys(randomBytes(32), randomBytes(16), randomBytes(16), S.SUITE_CHACHA);
   const session = { sid: "00", did: hs.device_id, keys };
@@ -91,6 +103,7 @@ test("ChaCha20-Poly1305 suite round trip", { skip: !existsSync(chachaPath) && "n
   await assert.rejects(S.open(session, 9, 1000, bad));
 });
 
+// La implementación JavaScript de ChaCha20-Poly1305 da los mismos bytes que OpenSSL, que es lo que usa .NET.
 test("noble ChaCha20-Poly1305 equals OpenSSL (same backend as .NET)", { skip: !existsSync(chachaPath) && "noble-ciphers not copied yet" }, async () => {
   const { createCipheriv } = await import("node:crypto");
   const { chacha20poly1305 } = await import(chachaPath.href);

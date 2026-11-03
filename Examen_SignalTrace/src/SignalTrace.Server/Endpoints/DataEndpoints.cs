@@ -11,33 +11,39 @@ using SignalTrace.Server.Services;
 
 namespace SignalTrace.Server.Endpoints;
 
-/// <summary>Decrypted readings, time grid with interpolation, packet history, statistics and CSV export.</summary>
+/// <summary>
+/// Endpoints de consulta: lecturas descifradas, rejilla de tiempo con interpolación, historial de paquetes,
+/// estadísticas y exportación a CSV. Un observador solo puede consultar sus propios dispositivos.
+/// </summary>
 public static class DataEndpoints
 {
+    /// <summary>Cultura invariante, para que los decimales del CSV siempre usen punto.</summary>
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
+    /// <summary>Registra las rutas de consulta bajo <c>/api</c>.</summary>
     public static void MapData(this WebApplication app)
     {
         var api = app.MapGroup("/api").RequireAuthorization("user");
 
-        // History of one device. maxPoints decimates long ranges (every k-th reading) so 24 h still fit in a chart.
+        // Historial de un dispositivo. maxPoints reduce los rangos largos (una de cada k lecturas) para que 24 h quepan en una gráfica.
         api.MapGet("/readings", async (Guid deviceId, long? from, long? to, int? limit, int? maxPoints, AppDb db, ClaimsPrincipal me, AtRestProtector atRest) =>
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
             var rows = await Query(db, deviceId, from, to, limit ?? 500);
-            // z-scores over the full series (before decimation), as the live pipeline computes them.
+            // Puntuaciones z sobre la serie completa (antes de reducirla), igual que las calcula la canalización en vivo.
             var z = AnalyticsEngine.RollingZ(rows);
             var picked = Enumerable.Range(0, rows.Count);
             if (maxPoints is > 0 and var maxP && rows.Count > maxP)
             {
                 var stride = (int)Math.Ceiling(rows.Count / (double)maxP);
-                // Keep every k-th reading, the last one and every anomaly so decimation does not hide them.
+                // Conserva una de cada k lecturas, la última y todas las anomalías, para que la reducción no las oculte.
                 picked = picked.Where(i => i % stride == 0 || i == rows.Count - 1 || z[i]?.Values.Any(v => Math.Abs(v) > AnalyticsEngine.ZThreshold) == true);
             }
             return Results.Ok(picked.Select(i => ReadingDto.From(rows[i], Parse(atRest, rows[i].Json), null, z[i])));
         });
 
-        // Regular time grid for one field: real samples, interpolated points (flagged) and gaps (null).
+        // Rejilla de tiempo regular para un campo: muestras reales, puntos interpolados (marcados) y huecos (null).
+        // También devuelve la media móvil simple y la exponencial de los valores.
         api.MapGet("/readings/grid", async (Guid deviceId, string field, long? from, long? to, long? stepMs, AppDb db, ClaimsPrincipal me) =>
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
@@ -45,7 +51,9 @@ public static class DataEndpoints
             if (selector is null) return Http.Error(400, "malformed", "field: rssi | rtt | loss | rms | battery | gyr | lux | hpa");
             var device = await db.Devices.FindAsync(deviceId);
             var rows = await Query(db, deviceId, from, to, 2000);
+            // Solo las lecturas que traen ese campo.
             var samples = rows.Select(r => (r.TsDevice, V: selector(r))).Where(x => x.V is not null).Select(x => (x.TsDevice, x.V!.Value)).ToList();
+            // Paso de la rejilla: el pedido o el intervalo medio del dispositivo, entre 200 ms y 1 min.
             var step = stepMs ?? (long)Math.Clamp(device?.IntervalMs ?? 1000, 200, 60_000);
             var grid = Numeric.ResampleLinear(samples, step);
             var values = grid.Select(g => g.Value ?? double.NaN).ToList();
@@ -61,6 +69,7 @@ public static class DataEndpoints
             });
         });
 
+        // Bitácora de paquetes (solo administradores), filtrable por dispositivo y estado.
         app.MapGet("/api/packets", async (Guid? deviceId, int? limit, string? status, AppDb db) =>
         {
             var q = db.Packets.AsQueryable();
@@ -72,9 +81,11 @@ public static class DataEndpoints
             return Results.Ok(list);
         }).RequireAuthorization("admin");
 
+        // Últimas trazas de paquetes guardadas en memoria para la consola.
         app.MapGet("/api/console/traces", (int? limit, TraceStore traces) => Results.Ok(traces.Recent(Math.Clamp(limit ?? 30, 1, 100))))
             .RequireAuthorization("admin");
 
+        // Totales de dispositivos, lecturas y paquetes por estado, limitados a lo que el usuario puede ver.
         api.MapGet("/stats", async (AppDb db, ClaimsPrincipal me) =>
         {
             var visible = (await VisibleDevices(db, me)).Keys.ToList();
@@ -83,7 +94,8 @@ public static class DataEndpoints
             return Results.Ok(new { devices = visible.Count, readings = await db.Readings.CountAsync(r => visible.Contains(r.DeviceId)), packets = byStatus });
         });
 
-        // ---- Exports
+        // ---- Exportación
+        // Lecturas de un dispositivo en CSV, con una columna por cada valor resumido.
         api.MapGet("/export/readings.csv", async (Guid deviceId, long? from, long? to, AppDb db, ClaimsPrincipal me) =>
         {
             if (!await CanSee(db, me, deviceId)) return Http.Error(403, "forbidden", "Sin acceso a ese dispositivo");
@@ -95,8 +107,11 @@ public static class DataEndpoints
         });
     }
 
+    /// <summary>Formatea un número opcional para el CSV (hasta 6 decimales, vacío si no hay valor).</summary>
     private static string N(double? v) => v?.ToString("0.######", Inv) ?? "";
 
+    /// <summary>Devuelve la función que extrae el campo pedido de una lectura, o null si el nombre no existe.</summary>
+    /// <param name="field">rssi, rtt, loss, rms, battery, gyr, lux o hpa.</param>
     private static Func<Reading, double?>? FieldSelector(string field) => field switch
     {
         "rssi" => r => r.WifiRssi ?? r.CellDbm,
@@ -110,25 +125,37 @@ public static class DataEndpoints
         _ => null,
     };
 
+    /// <summary>Descifra (si estaba cifrado en reposo) y deserializa el JSON guardado; null si no se puede leer.</summary>
     private static TelemetryPayload? Parse(AtRestProtector atRest, string stored)
     {
         try { return JsonSerializer.Deserialize<TelemetryPayload>(atRest.Unprotect(stored), Json.Options); }
         catch (Exception) { return null; }
     }
 
+    /// <summary>
+    /// Consulta las lecturas más recientes de un dispositivo dentro del rango y las devuelve en orden cronológico.
+    /// </summary>
+    /// <param name="db">Base de datos.</param>
+    /// <param name="deviceId">Dispositivo.</param>
+    /// <param name="from">Inicio del rango (ms), opcional.</param>
+    /// <param name="to">Fin del rango (ms), opcional.</param>
+    /// <param name="limit">Máximo de lecturas (de 1 a 100 000).</param>
     private static async Task<List<Reading>> Query(AppDb db, Guid deviceId, long? from, long? to, int limit)
     {
         var q = db.Readings.Where(r => r.DeviceId == deviceId);
         if (from is { } f) q = q.Where(r => r.TsDevice >= f);
         if (to is { } t) q = q.Where(r => r.TsDevice <= t);
+        // Toma las últimas N (orden descendente) y después las invierte para graficarlas de izquierda a derecha.
         var latest = await q.OrderByDescending(r => r.TsDevice).Take(Math.Clamp(limit, 1, 100_000)).ToListAsync();
         latest.Reverse();
         return latest;
     }
 
+    /// <summary>Indica si el usuario puede ver el dispositivo: es administrador o es su dueño.</summary>
     public static async Task<bool> CanSee(AppDb db, ClaimsPrincipal me, Guid deviceId)
         => await db.Devices.AnyAsync(d => d.Id == deviceId && (me.IsAdmin() || d.OwnerUserId == me.UserId()));
 
+    /// <summary>Dispositivos visibles para el usuario, con su nombre.</summary>
     private static async Task<Dictionary<Guid, string>> VisibleDevices(AppDb db, ClaimsPrincipal me)
         => await db.Devices.Where(d => me.IsAdmin() || d.OwnerUserId == me.UserId()).ToDictionaryAsync(d => d.Id, d => d.Name);
 }

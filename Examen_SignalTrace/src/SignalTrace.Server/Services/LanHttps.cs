@@ -8,21 +8,28 @@ using SignalTrace.Core;
 namespace SignalTrace.Server.Services;
 
 /// <summary>
-/// HTTPS for the local network (Https:Enabled). Phones need a secure context for Web Crypto and the motion sensors, so
-/// the server also listens on Https:Port with a self-signed ECDSA P-256 certificate created on first start
-/// (data/lan-cert.pfx). Its SHA-256 travels in the enrollment QR: the Android app pins that exact certificate and the
-/// browser shows a one-time warning.
+/// HTTPS para la red local (Https:Enabled). Los teléfonos necesitan un contexto seguro para usar Web Crypto y los
+/// sensores de movimiento, así que el servidor también escucha en Https:Port con un certificado ECDSA P-256
+/// autofirmado que se crea en el primer arranque (data/lan-cert.pfx). Su SHA-256 viaja en el QR de vinculación:
+/// la aplicación Android fija exactamente ese certificado y el navegador muestra una advertencia una sola vez.
 /// </summary>
 public sealed class LanHttps
 {
+    /// <summary>Si el HTTPS de la red local está activo.</summary>
     public bool Enabled { get; }
+    /// <summary>Puerto HTTPS (5443 por defecto).</summary>
     public int Port { get; }
+    /// <summary>Certificado que presenta Kestrel en ese puerto.</summary>
     public X509Certificate2? Certificate { get; }
-    /// <summary>SHA-256 of the certificate (DER), lowercase hex.</summary>
+    /// <summary>SHA-256 del certificado (DER) en hexadecimal minúsculo.</summary>
     public string? CertSha256 { get; }
 
+    /// <summary>Dirección configurada a mano para anunciar, si la hay.</summary>
     private readonly string? _advertise;
 
+    /// <summary>Lee la configuración y, si está activo, carga o crea el certificado.</summary>
+    /// <param name="cfg">Configuración (Https:Enabled, Https:Port, Https:AdvertiseUrl, Https:CertificatePath).</param>
+    /// <param name="paths">Rutas de la carpeta de datos.</param>
     public LanHttps(IConfiguration cfg, ServerPaths paths)
     {
         Enabled = cfg.GetValue("Https:Enabled", false);
@@ -34,20 +41,26 @@ public sealed class LanHttps
     }
 
     /// <summary>
-    /// The address a phone on the same network can reach: Https:AdvertiseUrl (e.g. the host's IP when running in a
-    /// container), else https://{first LAN IPv4}:{port}.
+    /// La dirección que puede alcanzar un teléfono de la misma red: Https:AdvertiseUrl (por ejemplo, la IP del equipo
+    /// cuando el servidor corre en un contenedor) o, si no, https://{primera IPv4 de la red local}:{puerto}.
     /// </summary>
     public string? LanUrl => !Enabled ? null : _advertise ?? (LanAddresses().FirstOrDefault() is { } ip ? $"https://{ip}:{Port}" : null);
 
+    /// <summary>Direcciones IPv4 del equipo en interfaces activas, sin la de loopback.</summary>
     public static IEnumerable<IPAddress> LanAddresses() =>
         NetworkInterface.GetAllNetworkInterfaces()
             .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-            // Interfaces with a default gateway first (the real LAN, not docker/virtual bridges).
+            // Primero las interfaces con puerta de enlace (la red local real, no los puentes de Docker o virtuales).
             .OrderByDescending(n => n.GetIPProperties().GatewayAddresses.Any(g => !g.Address.Equals(IPAddress.Any)))
             .SelectMany(n => n.GetIPProperties().UnicastAddresses)
             .Select(a => a.Address)
             .Where(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a));
 
+    /// <summary>
+    /// Carga el certificado del archivo o, si no existe, crea uno autofirmado válido por 2 años con nombres
+    /// alternativos para localhost, el nombre del equipo y sus IP, y lo guarda con permisos restringidos.
+    /// </summary>
+    /// <param name="path">Ruta del archivo PFX.</param>
     private static X509Certificate2 LoadOrCreate(string path)
     {
         if (File.Exists(path)) return X509CertificateLoader.LoadPkcs12FromFile(path, null);
@@ -59,9 +72,11 @@ public sealed class LanHttps
         san.AddIpAddress(IPAddress.Loopback);
         foreach (var ip in LanAddresses()) san.AddIpAddress(ip);
         req.CertificateExtensions.Add(san.Build());
+        // Certificado final (no de autoridad), solo para firmar, con el uso «autenticación de servidor TLS» (OID 1.3.6.1.5.5.7.3.1).
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
         req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], false));
+        // Empieza un día antes para tolerar relojes desfasados.
         using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(2));
         File.WriteAllBytes(path, cert.Export(X509ContentType.Pfx));
         ServerPaths.TryRestrict(path);

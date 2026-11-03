@@ -10,10 +10,17 @@ using SignalTrace.Core;
 
 namespace SignalTrace.Server.Tests;
 
+/// <summary>
+/// Pruebas de integración de la API contra el servidor real en memoria: inicio de sesión, telemetría aceptada y
+/// cada tipo de rechazo (alteración, reenvío, sesión desconocida, token ajeno, carga inválida), roles, intermediario,
+/// vinculación por QR, laboratorio y SignalR.
+/// </summary>
 public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
 {
+    /// <summary>Cliente HTTP nuevo contra el servidor compartido.</summary>
     private HttpClient Client() => fx.Factory.CreateClient();
 
+    /// <summary>Dispositivo registrado y con handshake hecho, listo para enviar.</summary>
     private async Task<TestDevice> ReadyDevice(string suite = Suites.AesGcm)
     {
         var http = Client();
@@ -22,6 +29,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         return dev;
     }
 
+    /// <summary>Una contraseña incorrecta da 401 y la correcta da el rol del usuario.</summary>
     [Fact]
     public async Task Login_WrongPassword_401_Right_200()
     {
@@ -34,6 +42,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("admin", body!.Role);
     }
 
+    /// <summary>Un paquete válido se confirma con su secuencia y después aparece descifrado en el historial.</summary>
     [Fact]
     public async Task Telemetry_Success_Then_ReadingVisible()
     {
@@ -50,6 +59,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal(90, list[0].GetProperty("p").GetProperty("ori").GetProperty("az").GetDouble());
     }
 
+    /// <summary>Un bit cambiado en el texto cifrado da 422 auth_failed, y el paquete original sigue siendo aceptado después.</summary>
     [Fact]
     public async Task Tampered_Ciphertext_422_AuthFailed()
     {
@@ -60,10 +70,11 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var r = await dev.Send(env with { Ct = Convert.ToBase64String(ct) });
         Assert.Equal((HttpStatusCode)422, r.StatusCode);
         Assert.Equal("auth_failed", await TestDevice.Code(r));
-        // The rejected packet did not burn the sequence number.
+        // El paquete rechazado no consumió el número de secuencia.
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(env)).StatusCode);
     }
 
+    /// <summary>Enviar dos veces el mismo paquete da 409 replay la segunda vez.</summary>
     [Fact]
     public async Task Replay_409()
     {
@@ -75,6 +86,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("replay", await TestDevice.Code(again));
     }
 
+    /// <summary>Una sesión que no existe da 404 unknown_session.</summary>
     [Fact]
     public async Task UnknownSession_404()
     {
@@ -85,6 +97,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("unknown_session", await TestDevice.Code(r));
     }
 
+    /// <summary>El paquete de un dispositivo enviado con el token de otro da 401.</summary>
     [Fact]
     public async Task OtherDevicesToken_401()
     {
@@ -95,6 +108,10 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("unauthorized", await TestDevice.Code(r));
     }
 
+    /// <summary>
+    /// Una carga fuera de rango da 422 sin consumir la secuencia, y una carga cuyo «t» no coincide con el «ts» del
+    /// sobre también se rechaza.
+    /// </summary>
     [Fact]
     public async Task InvalidPayload_422_And_SeqNotConsumed()
     {
@@ -104,11 +121,12 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal((HttpStatusCode)422, r.StatusCode);
         Assert.Equal("invalid_payload", await TestDevice.Code(r));
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\"}", seq: 1))).StatusCode);
-        // t of the payload must equal ts of the envelope (both are authenticated).
+        // El «t» de la carga debe ser igual al «ts» del sobre (los dos están autenticados).
         var mismatch = dev.Seal("{\"t\":5,\"src\":\"sim\"}", seq: 2);
         Assert.Equal("invalid_payload", await TestDevice.Code(await dev.Send(mismatch)));
     }
 
+    /// <summary>Un JSON roto da 400 malformed y una solicitud sin token da 401.</summary>
     [Fact]
     public async Task Malformed_400_And_NoToken_401()
     {
@@ -121,6 +139,10 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("unauthorized", await TestDevice.Code(anon));
     }
 
+    /// <summary>
+    /// Un observador no puede crear usuarios ni ver dispositivos ajenos, y un token de dispositivo no puede leer
+    /// datos de la API de usuarios.
+    /// </summary>
     [Fact]
     public async Task Roles_ViewerCannotCreateUsers_DeviceTokenCannotReadData()
     {
@@ -141,12 +163,13 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         read.Headers.Authorization = new AuthenticationHeaderValue("Bearer", dev.DeviceToken);
         Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(read)).StatusCode);
 
-        // A viewer does not see the admin's devices.
+        // Un observador no ve los dispositivos del administrador.
         var vlist = new HttpRequestMessage(HttpMethod.Get, $"/api/readings?deviceId={dev.DeviceId}");
         vlist.Headers.Authorization = new AuthenticationHeaderValue("Bearer", viewer);
         Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(vlist)).StatusCode);
     }
 
+    /// <summary>Si el servidor responde con la firma del intermediario simulado, el cliente rechaza el handshake.</summary>
     [Fact]
     public async Task Mitm_Handshake_RejectedByClient()
     {
@@ -158,6 +181,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Throws<CryptographicException>(() => hs.Complete(resp, dev.PinnedKey));
     }
 
+    /// <summary>Una llave pública que no mide 65 bytes da 400.</summary>
     [Fact]
     public async Task Handshake_RejectsBadKeyLength()
     {
@@ -167,6 +191,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
     }
 
+    /// <summary>La suite ChaCha20-Poly1305 se negocia y sus paquetes se aceptan (si la plataforma la soporta).</summary>
     [Fact]
     public async Task ChaCha20Suite_Works()
     {
@@ -176,6 +201,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\"}"))).StatusCode);
     }
 
+    /// <summary>El QR es una URL al agente web con el código en el fragmento, y el código solo se puede canjear una vez.</summary>
     [Fact]
     public async Task Enrollment_Code_Redeem_Once()
     {
@@ -184,11 +210,11 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
         var enroll = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
         var code = enroll.GetProperty("code").GetString()!;
-        // The QR is an ordinary URL that opens the web agent; code and fingerprint travel in the fragment.
+        // El QR es una URL normal que abre el agente web; el código y la huella viajan en el fragmento.
         var qr = new Uri(enroll.GetProperty("qr").GetString()!);
         Assert.Equal("/agent.html", qr.AbsolutePath);
         var fragment = $"#enroll={code}&fp={enroll.GetProperty("fingerprint").GetString()}";
-        // Without a public URL the QR points to the LAN HTTPS endpoint and also pins its self-signed certificate.
+        // Sin URL pública, el QR apunta al HTTPS de la red local y también fija su certificado autofirmado.
         if (enroll.TryGetProperty("tls", out var tls)) fragment += $"&tls={tls.GetString()}";
         Assert.Equal(fragment, qr.Fragment);
         var first = await http.PostAsJsonAsync("/api/enroll/redeem", new { code, name = "phone", kind = "web" });
@@ -197,13 +223,14 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
     }
 
+    /// <summary>Detrás de un proxy HTTPS, el QR usa el origen público y no fija el certificado local.</summary>
     [Fact]
     public async Task Enrollment_BehindHttpsProxy_UsesPublicOrigin_WithoutTlsPin()
     {
         var http = Client();
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/enroll");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TestDevice.Login(http));
-        // What cloudflared forwards: plain HTTP to the container, original Host and X-Forwarded-Proto: https.
+        // Lo que reenvía cloudflared: HTTP simple al contenedor, el Host original y X-Forwarded-Proto: https.
         req.Headers.Host = "signaltrace.example.com";
         req.Headers.Add("X-Forwarded-Proto", "https");
         var enroll = await (await http.SendAsync(req)).Content.ReadFromJsonAsync<JsonElement>();
@@ -213,6 +240,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.False(enroll.TryGetProperty("tls", out _));
     }
 
+    /// <summary>El ataque del laboratorio recupera el segundo mensaje predeterminado.</summary>
     [Fact]
     public async Task Lab_Ycm1Attack_RecoversSecondMessage()
     {
@@ -223,6 +251,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal("{\"env\":{\"lux\":412,\"hpa\":779.3},\"ori\":{\"az\":87,\"pi\":-12,\"ro\":3}}", r.GetProperty("recoveredPlaintext").GetString());
     }
 
+    /// <summary>Tras borrar las sesiones, el paquete da 404 y, al repetir el handshake, vuelve a aceptarse.</summary>
     [Fact]
     public async Task Lab_ResetSessions_GivesUnknownSession()
     {
@@ -235,6 +264,10 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal("{\"t\":$T,\"src\":\"sim\"}"))).StatusCode);
     }
 
+    /// <summary>
+    /// Una conexión SignalR autenticada recibe la lectura y la traza con todas las etapas de YCM1; sin token no se
+    /// puede conectar.
+    /// </summary>
     [Fact]
     public async Task SignalR_Authenticated_ReceivesReadingAndTrace()
     {
@@ -258,7 +291,7 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
         var r = await reading.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(0.5, r.GetProperty("batLvl").GetDouble());
         var t = await trace.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Equal(9, t.GetProperty("ycm1Stages").GetArrayLength() - 1); // padded + 3 rounds × 3 stages
+        Assert.Equal(9, t.GetProperty("ycm1Stages").GetArrayLength() - 1); // padded + 3 rondas × 3 etapas
         await conn.DisposeAsync();
 
         var anonymous = new HubConnectionBuilder()
@@ -268,8 +301,10 @@ public class ApiTests(StFactoryFixture fx) : IClassFixture<StFactoryFixture>
     }
 }
 
+/// <summary>Pruebas que necesitan un servidor propio con otra configuración (ventana contra reenvío y cifrado en reposo).</summary>
 public class ReplayWindowTests
 {
+    /// <summary>Con la ventana de 64 se aceptan paquetes desordenados pero no duplicados ni demasiado viejos.</summary>
     [Fact]
     public async Task Window_AcceptsOutOfOrder_RejectsDuplicates()
     {
@@ -282,9 +317,10 @@ public class ReplayWindowTests
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal(p, seq: 3))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await dev.Send(dev.Seal(p, seq: 3))).StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, (await dev.Send(dev.Seal(p, seq: 70))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await dev.Send(dev.Seal(p, seq: 5))).StatusCode); // older than 64
+        Assert.Equal(HttpStatusCode.Conflict, (await dev.Send(dev.Seal(p, seq: 5))).StatusCode); // más antiguo que 64
     }
 
+    /// <summary>Con cifrado en reposo la base de datos guarda «enc:…», pero la API devuelve los valores en claro.</summary>
     [Fact]
     public async Task EncryptAtRest_StoresCiphertext_ApiReturnsPlain()
     {
@@ -306,8 +342,11 @@ public class ReplayWindowTests
     }
 }
 
+/// <summary>Servidor de prueba compartido por todas las pruebas de una clase (se crea una vez y se libera al final).</summary>
 public sealed class StFactoryFixture : IDisposable
 {
+    /// <summary>Servidor compartido.</summary>
     public StFactory Factory { get; } = new();
+    /// <summary>Libera el servidor y su carpeta temporal.</summary>
     public void Dispose() => Factory.Dispose();
 }

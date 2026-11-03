@@ -3,8 +3,10 @@ using SignalTrace.Core;
 
 namespace SignalTrace.Core.Tests;
 
+/// <summary>Pruebas de propiedades del núcleo criptográfico con datos aleatorios.</summary>
 public class PropertyTests
 {
+    /// <summary>Descifrar lo cifrado devuelve el original para todas las longitudes de 0 a 199 bytes (incluye el relleno).</summary>
     [Fact]
     public void Ycm1_RoundTrip_Lengths_0_To_199()
     {
@@ -17,6 +19,7 @@ public class PropertyTests
         }
     }
 
+    /// <summary>Los parámetros dependen solo de la llave y la secuencia: iguales para la misma secuencia, distintos para otra.</summary>
     [Fact]
     public void Ycm1_Params_Deterministic_And_SeqSensitive()
     {
@@ -25,20 +28,23 @@ public class PropertyTests
         Assert.NotEqual(YaelCryptoMarch1.DeriveParams(key, 5).Rounds, YaelCryptoMarch1.DeriveParams(key, 6).Rounds);
     }
 
+    /// <summary>Un relleno inválido o una longitud impar provocan una excepción al descifrar.</summary>
     [Fact]
     public void Ycm1_BadPadding_Throws()
     {
         var key = RandomNumberGenerator.GetBytes(32);
         var prm = YaelCryptoMarch1.DeriveParams(key, 1);
-        // Encrypt an unpadded block whose last byte is 3: decrypting with padding must reject it.
+        // Cifra un bloque sin relleno cuyo último byte es 3: al descifrar con relleno se debe rechazar.
         var c = YaelCryptoMarch1.EncryptWithParams([10, 3], prm, pad: false);
         Assert.Throws<CryptographicException>(() => YaelCryptoMarch1.DecryptWithParams(c, prm));
         Assert.Throws<CryptographicException>(() => YaelCryptoMarch1.Decrypt([1, 2, 3], key, 1));
     }
 
+    /// <summary>El LCG recorre los 256 estados (periodo completo por Hull–Dobell).</summary>
     [Fact]
     public void Lcg_HasFullPeriod_HullDobell() => Assert.Equal(256, YaelCryptoMarch1.LcgPeriod());
 
+    /// <summary>det K = (1 + k·m) − k·m = 1 mod 256 para todos los k y m posibles: la matriz siempre es invertible.</summary>
     [Fact]
     public void Matrix_Determinant_Is_One_For_All_K_M()
     {
@@ -47,6 +53,10 @@ public class PropertyTests
                 Assert.Equal(1, ((1 + k * m) - k * m) & 0xFF);
     }
 
+    /// <summary>
+    /// Con cualquiera de las dos suites, cambiar un bit del paquete hace fallar la autenticación,
+    /// igual que cambiar la secuencia o la marca de tiempo.
+    /// </summary>
     [Theory]
     [InlineData(Suites.AesGcm)]
     [InlineData(Suites.ChaCha20Poly1305)]
@@ -56,17 +66,22 @@ public class PropertyTests
         var keys = SessionKeys.Derive(RandomNumberGenerator.GetBytes(32), RandomNumberGenerator.GetBytes(16), RandomNumberGenerator.GetBytes(16), suite);
         var did = Guid.NewGuid().ToString("D");
         var ct = PacketCrypto.Seal(keys, did, 3, 1000, "{\"t\":1000,\"src\":\"sim\"}"u8);
+        // Prueba uno de cada 7 bits para cubrir todo el paquete sin tardar demasiado.
         for (var bit = 0; bit < ct.Length * 8; bit += 7)
         {
             var bad = (byte[])ct.Clone();
             bad[bit / 8] ^= (byte)(1 << (bit % 8));
             Assert.Throws<AuthenticationFailedException>(() => PacketCrypto.Open(keys, did, 3, 1000, bad));
         }
-        // Same bytes under a different seq/ts (AAD and nonce) must also fail.
+        // Los mismos bytes con otra secuencia o marca de tiempo (cambian el AAD y el nonce) también deben fallar.
         Assert.Throws<AuthenticationFailedException>(() => PacketCrypto.Open(keys, did, 4, 1000, ct));
         Assert.Throws<AuthenticationFailedException>(() => PacketCrypto.Open(keys, did, 3, 1001, ct));
     }
 
+    /// <summary>
+    /// Handshake completo simulando al servidor a mano: ambos lados derivan las mismas llaves, y una firma hecha con
+    /// otra llave (intermediario) se rechaza.
+    /// </summary>
     [Fact]
     public void Full_Handshake_ClientServer_DeriveSameKeys()
     {
@@ -75,6 +90,7 @@ public class PropertyTests
         var did = Guid.NewGuid().ToString("D");
         using var client = new ClientHandshake(did);
 
+        // Lado servidor: llave efímera, nonce, sesión, llaves y firma del transcript.
         using var serverEph = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
         var sPub = EcKeys.ExportPublic(serverEph);
         var sNonce = RandomNumberGenerator.GetBytes(16);
@@ -88,11 +104,12 @@ public class PropertyTests
         Assert.Equal(serverKeys.KAead, clientKeys.KAead);
         Assert.Equal(serverKeys.KSig, clientKeys.KSig);
 
-        // MITM: a different signing key must be rejected.
+        // Intermediario (MITM): si el cliente fijó otra llave, la firma debe rechazarse.
         using var attacker = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         Assert.Throws<CryptographicException>(() => client.Complete(resp, EcKeys.ExportPublic(attacker)));
     }
 
+    /// <summary>La entropía es 0 para bytes iguales y 8 para los 256 valores distintos.</summary>
     [Fact]
     public void Entropy_Bounds()
     {
@@ -101,8 +118,10 @@ public class PropertyTests
     }
 }
 
+/// <summary>Pruebas del ataque de texto claro conocido contra YCM1 de una ronda.</summary>
 public class CryptanalysisTests
 {
+    /// <summary>Inverso modular y solución de congruencias lineales, incluidos los casos con varias soluciones o ninguna.</summary>
     [Fact]
     public void LinearCongruence_And_ModInverse()
     {
@@ -112,6 +131,10 @@ public class CryptanalysisTests
         Assert.Empty(Ycm1Cryptanalysis.SolveLinear(2, 3));
     }
 
+    /// <summary>
+    /// Con cinco parámetros secretos distintos, el ataque recupera la ronda (rotación módulo n) y con ella descifra
+    /// un segundo mensaje cifrado con los mismos parámetros.
+    /// </summary>
     [Fact]
     public void KnownPlaintext_Breaks_OneRound()
     {

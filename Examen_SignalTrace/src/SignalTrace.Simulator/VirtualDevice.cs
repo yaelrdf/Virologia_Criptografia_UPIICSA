@@ -8,38 +8,67 @@ using SignalTrace.Core;
 
 namespace SignalTrace.Simulator;
 
+/// <summary>Credenciales guardadas de un dispositivo simulado (se reutilizan entre ejecuciones).</summary>
 public sealed record DeviceCredentials(string DeviceId, string DeviceToken, string Name);
 
+/// <summary>Contadores compartidos por todos los dispositivos virtuales.</summary>
 public sealed class Stats
 {
+    /// <summary>Paquetes enviados, aceptados, handshakes hechos y errores de red.</summary>
     public long Sent, Ok, Handshakes, NetworkErrors;
+    /// <summary>Rechazos por código de error.</summary>
     public readonly ConcurrentDictionary<string, long> Rejected = new();
+    /// <summary>Suma de latencias en ms, para calcular la media.</summary>
     public double LatencyMsSum;
 
+    /// <summary>Cuenta un rechazo con su código.</summary>
     public void Reject(string code) => Rejected.AddOrUpdate(code, 1, (_, n) => n + 1);
 }
 
 /// <summary>
-/// One simulated device: realistic synthetic telemetry for the whole sensor bank (2–7 Hz vibration, slowly turning
-/// orientation, light, pressure, steps, RSSI and RTT with drift and optional anomalies, draining battery) sealed with the real protocol and sent over HTTP or MQTT, in series.
+/// Un dispositivo simulado: genera telemetría sintética realista de todo el banco de sensores (vibración de 2–7 Hz,
+/// orientación que gira poco a poco, luz, presión, pasos, RSSI y RTT con deriva y anomalías opcionales, batería que
+/// se descarga), la sella con el protocolo real y la envía por HTTP o MQTT, un paquete después de otro.
 /// </summary>
+/// <param name="index">Número del dispositivo; fija la semilla aleatoria y desplaza sus valores iniciales.</param>
+/// <param name="cred">Id y token del dispositivo.</param>
+/// <param name="opt">Opciones de la línea de comandos.</param>
+/// <param name="http">Cliente HTTP compartido.</param>
+/// <param name="pinnedKey">Llave pública fijada del servidor.</param>
+/// <param name="stats">Contadores compartidos.</param>
 public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt, HttpClient http, byte[] pinnedKey, Stats stats)
 {
+    /// <summary>Generador aleatorio con semilla fija, para que cada ejecución sea reproducible.</summary>
     private readonly Random _rnd = new(1000 + index);
+    /// <summary>Llaves de la sesión actual (null obliga a repetir el handshake).</summary>
     private SessionKeys? _keys;
+    /// <summary>Id de la sesión actual.</summary>
     private string? _sid;
+    /// <summary>Último número de secuencia usado.</summary>
     private ulong _seq;
+    /// <summary>Paquetes generados.</summary>
     private long _packets;
+    /// <summary>Estado de los sensores lentos: azimut, luz, presión y temperatura.</summary>
     private double _az = index * 37 % 360, _lux = 250 + 40 * index, _hpa = 779 + index % 5, _tmp = 22 + index % 4;
+    /// <summary>Pasos acumulados.</summary>
     private long _steps;
+    /// <summary>Estado de batería, señal y RTT.</summary>
     private double _bat = 0.95 - 0.03 * (index % 10), _rssi = -55 - index % 15, _rtt = 35 + index % 20;
+    /// <summary>Frecuencia de la vibración simulada (Hz); aparece como pico en el espectro.</summary>
     private readonly double _vibHz = 2 + index % 6;
+    /// <summary>Tiempo simulado del acelerómetro en segundos.</summary>
     private double _t;
+    /// <summary>Cliente MQTT, si se usa ese transporte.</summary>
     private IMqttClient? _mqtt;
+    /// <summary>Espera de la confirmación MQTT del paquete en curso.</summary>
     private TaskCompletionSource<JsonElement>? _ack;
 
+    /// <summary>Número aleatorio con distribución normal estándar (método de Box–Muller).</summary>
     private double Gauss() => Math.Sqrt(-2 * Math.Log(1 - _rnd.NextDouble())) * Math.Cos(2 * Math.PI * _rnd.NextDouble());
 
+    /// <summary>
+    /// Ciclo de envío a la frecuencia configurada. Un error de red espera 1 s y continúa; una cancelación termina.
+    /// </summary>
     public async Task RunAsync(CancellationToken stop)
     {
         var period = TimeSpan.FromSeconds(1 / opt.Rate);
@@ -57,8 +86,9 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
     }
 
     /// <summary>
-    /// --gaps imitates a locked screen: every 40 s a 4 s pause (filled by interpolation on the server grid), and every
-    /// third cycle a 12 s pause (left as a gap). Devices are phase-shifted so they do not pause together.
+    /// --gaps imita una pantalla bloqueada: cada 40 s una pausa de 4 s (el servidor la rellena con interpolación en la
+    /// rejilla) y cada tercer ciclo una pausa de 12 s (queda como hueco). Los dispositivos están desfasados para no
+    /// pausar todos a la vez.
     /// </summary>
     private bool IsPaused(double seconds)
     {
@@ -68,6 +98,7 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         return inCycle >= 30 && inCycle < 30 + (cycle % 3 == 2 ? 12 : 4);
     }
 
+    /// <summary>Hace el handshake con el servidor y guarda las llaves; reinicia la secuencia en 0.</summary>
     private async Task Handshake(CancellationToken ct)
     {
         using var hs = new ClientHandshake(cred.DeviceId, opt.Suite);
@@ -76,12 +107,13 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         using var res = await http.SendAsync(req, ct);
         res.EnsureSuccessStatusCode();
         var body = (await res.Content.ReadFromJsonAsync<HandshakeResponse>(Json.Options, ct))!;
-        _keys = hs.Complete(body, pinnedKey); // throws if the signature does not match the pinned key
+        _keys = hs.Complete(body, pinnedKey); // lanza una excepción si la firma no coincide con la llave fijada
         _sid = body.SessionId;
         _seq = 0;
         Interlocked.Increment(ref stats.Handshakes);
     }
 
+    /// <summary>Genera, sella y envía un paquete, y actualiza los contadores según la respuesta.</summary>
     private async Task SendOne(CancellationToken ct)
     {
         if (_keys is null) await Handshake(ct);
@@ -98,10 +130,11 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         lock (stats) stats.LatencyMsSum += sw.Elapsed.TotalMilliseconds;
         if (ok) { Interlocked.Increment(ref stats.Ok); return; }
         stats.Reject(code);
-        if (code == "unknown_session") _keys = null; // server restarted: redo the handshake on the next tick
+        if (code == "unknown_session") _keys = null; // el servidor se reinició: repite el handshake en el siguiente ciclo
         if (code == "unauthorized") throw new OperationCanceledException($"{cred.Name}: token revocado");
     }
 
+    /// <summary>Envía el sobre por HTTP y devuelve si se aceptó y el código de error.</summary>
     private async Task<(bool, string)> PostHttp(byte[] body, CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Post, "/api/telemetry") { Content = new ByteArrayContent(body) };
@@ -113,6 +146,10 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         return (false, err?.Code ?? ((int)res.StatusCode).ToString());
     }
 
+    /// <summary>
+    /// Se conecta al broker MQTT con usuario = id del dispositivo y contraseña = su token, y se suscribe a su tema de
+    /// confirmaciones. Cada confirmación recibida completa la espera del paquete en curso.
+    /// </summary>
     private async Task ConnectMqtt(CancellationToken ct)
     {
         _mqtt = new MqttClientFactory().CreateMqttClient();
@@ -128,6 +165,7 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         await _mqtt.SubscribeAsync($"st/{cred.DeviceId}/ack", cancellationToken: ct);
     }
 
+    /// <summary>Publica el sobre por MQTT y espera hasta 10 s su confirmación.</summary>
     private async Task<(bool, string)> PublishMqtt(byte[] body, CancellationToken ct)
     {
         _ack = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -136,7 +174,10 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         return ack.TryGetProperty("ack", out _) ? (true, "ok") : (false, ack.GetProperty("code").GetString() ?? "?");
     }
 
-    /// <summary>Builds the next reading (PLAN §8). Anomalies: occasional RSSI drops, RTT spikes and strong vibration.</summary>
+    /// <summary>
+    /// Arma la siguiente lectura (PLAN §8). Cada valor hace una caminata aleatoria que tiende a volver a un valor típico.
+    /// Anomalías (con --anomalies, 3 % de los paquetes): caídas de RSSI, picos de RTT y vibración fuerte.
+    /// </summary>
     private TelemetryPayload NextPayload(long ts)
     {
         var dt = 1 / opt.Rate;
@@ -154,7 +195,7 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         var rtt = anomaly && _rnd.NextDouble() < 0.5 ? _rtt + 600 : _rtt;
         var vibAmp = anomaly ? 3.0 : 0.4;
 
-        // 32 Hz acceleration window: gravity + sinusoidal vibration + noise.
+        // Ventana de aceleración a 32 Hz: gravedad + vibración senoidal + ruido.
         const int fs = 32, n = 64;
         var mag = new double[n];
         for (var i = 0; i < n; i++)
@@ -162,16 +203,19 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
             _t += 1.0 / fs;
             mag[i] = Math.Round(9.81 + vibAmp * Math.Sin(2 * Math.PI * _vibHz * _t) + 0.05 * Gauss(), 3);
         }
+        // RMS alrededor de la media (sin la gravedad).
         var mean = mag.Average();
         var rms = Math.Sqrt(mag.Sum(v => (v - mean) * (v - mean)) / n);
         return new TelemetryPayload
         {
             T = ts,
             Src = "sim",
+            // La ventana completa solo va en uno de cada 5 paquetes, para no inflar el tráfico.
             Mot = new MotionData { Ax = 0.02, Ay = -0.01, Az = Math.Round(mean, 3), Rms = Math.Round(rms, 4), Peak = Math.Round(mag.Max(v => Math.Abs(v - mean)), 4), Fs = fs, Mag = _packets % 5 == 0 ? mag : null },
             Lin = V(0.3 * Gauss(), 0.3 * Gauss(), mean - 9.81),
             Grv = V(0.05, -0.02, 9.80),
             Gyr = V(0.02 * Gauss(), 0.02 * Gauss(), 0.07 * Gauss()),
+            // Campo magnético coherente con el azimut simulado.
             Mfl = V(22 * Math.Cos(_az * Math.PI / 180), -22 * Math.Sin(_az * Math.PI / 180), -38 + Gauss()),
             Ori = new OrientationData { Az = Math.Round(_az, 1), Pi = Math.Round(-2 + Gauss(), 1), Ro = Math.Round(1 + Gauss(), 1) },
             Env = new EnvData { Lux = Math.Round(_lux), Prx = 5, Hpa = Math.Round(_hpa, 2), Tmp = Math.Round(_tmp, 1), Hum = Math.Round(45 + 3 * Math.Sin(_t / 60), 1) },
@@ -183,5 +227,6 @@ public sealed class VirtualDevice(int index, DeviceCredentials cred, Options opt
         };
     }
 
+    /// <summary>Crea un vector redondeado a 3 decimales.</summary>
     private static Vec3 V(double x, double y, double z) => new() { X = Math.Round(x, 3), Y = Math.Round(y, 3), Z = Math.Round(z, 3) };
 }
