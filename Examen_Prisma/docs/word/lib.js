@@ -67,9 +67,16 @@ function runs(text, base = {}) {
  */
 const P = (text, opts = {}) => new Paragraph({ children: runs(text, opts.run), spacing: { after: 120, line: 276 }, alignment: opts.align ?? AlignmentType.JUSTIFIED, ...opts.para });
 /** Títulos: H1 abre página nueva (capítulo); H1keep es un H1 sin salto; H2 y H3 son subtítulos. */
-const H1 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(t)], pageBreakBefore: true });
-const H1keep = (t) => new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(t)] });
-const H2 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(t)] });
+/**
+ * Numeración automática de capítulos y secciones: H1 lleva "N." y H2 lleva "N.M". Si el texto ya trae un
+ * número al inicio (p. ej. "4.2 Paso a paso"), se descarta y se usa el calculado, así la numeración queda
+ * siempre continua aunque se quiten o se muevan capítulos.
+ */
+let chapter = 0, section = 0;
+const unnumber = (t) => t.replace(/^\d+(\.\d+)*\.?\s+/, "");
+const H1 = (t) => { chapter++; section = 0; return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(`${chapter}. ${unnumber(t)}`)], pageBreakBefore: true }); };
+const H1keep = (t) => { chapter++; section = 0; return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(`${chapter}. ${unnumber(t)}`)] }); };
+const H2 = (t) => { section++; return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(`${chapter}.${section} ${unnumber(t)}`)], keepNext: true }); };
 const H3 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(t)] });
 /** Párrafo con un salto de página. */
 const pageBreak = () => new Paragraph({ children: [new PageBreak()] });

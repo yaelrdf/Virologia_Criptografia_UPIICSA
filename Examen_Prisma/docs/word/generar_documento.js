@@ -1,9 +1,8 @@
 /**
  * Genera la documentación técnica del sistema ABCO en Word (.docx) con la librería docx.
  *
- * El contenido (portada, índice y los capítulos 1 a 16) se escribe aquí con los constructores de
- * lib.js; los diagramas, las capturas, las métricas medidas (docs/metricas.md) y la traza de ejemplo
- * se leen de la carpeta docs. Los nombres "Prisma" de rutas y proyectos son los nombres internos de ABCO.
+ * El contenido (portada, índice y capítulos, numerados automáticamente por lib.js) se escribe aquí con
+ * los constructores de lib.js; los diagramas, las capturas y la traza de ejemplo se leen de la carpeta docs. Los nombres "Prisma" de rutas y proyectos son los nombres internos de ABCO.
  *
  * Uso (desde Examen_Prisma):  NODE_PATH=<carpeta con node_modules/docx> node docs/word/generar_documento.js <salida.docx>
  */
@@ -20,23 +19,8 @@ const DIAG = (n) => path.join(ROOT, "docs", "diagramas", "png", n + ".png");
 const SHOT = (n) => path.join(ROOT, "docs", "capturas", n);
 /** Archivo de salida: primer argumento o, por defecto, Documentacion_Sistema_ABCO.docx en la raíz. */
 const out = process.argv[2] || path.join(ROOT, "Documentacion_Sistema_ABCO.docx");
-/** Métricas medidas por tools/Prisma.Metrics y traza de ejemplo de una operación ABCO. */
-const metricas = fs.readFileSync(path.join(ROOT, "docs", "metricas.md"), "utf8");
+/** Traza de ejemplo de una operación ABCO (impresa por el servidor en modo demo). */
 const traza = fs.readFileSync(path.join(ROOT, "docs", "traza_ejemplo.txt"), "utf8");
-/** Capturas de la app Android (archivos android_*), en orden, y el pie de figura de cada una. */
-const androidShots = fs.existsSync(path.join(ROOT, "docs", "capturas"))
-  ? fs.readdirSync(path.join(ROOT, "docs", "capturas")).filter((f) => f.startsWith("android_")).sort() : [];
-const androidCaptions = {
-  "android_01_login.jpg": "App Android: inicio de sesión con el logo del panda, ajustes (tema y servidor) y «¿Olvidaste tu contraseña?».",
-  "android_02_ocultar.jpg": "App Android (vertical): ocultar un mensaje; barra de navegación inferior con el destino Admin.",
-  "android_03_ocultar_horizontal.jpg": "App Android (horizontal): riel lateral y tarjetas en dos columnas que aprovechan todo el ancho.",
-  "android_04_revelar_teclado.jpg": "App Android: en Revelar, el campo de la frase queda visible sobre el teclado.",
-  "android_05_admin.jpg": "App Android: consola de administración (usuarios con nombre ofuscado y acciones).",
-  "android_06_admin_horizontal.jpg": "App Android (horizontal): administración con usuarios y auditoría lado a lado.",
-  "android_07_temporal.jpg": "App Android: contraseña temporal generada por el administrador.",
-  "android_08_cambiar.jpg": "App Android: cambio obligatorio de contraseña al entrar con la temporal.",
-  "android_09_cuenta_oscuro.jpg": "App Android: Cuenta en tema oscuro, con selector de tema y cambio de contraseña.",
-};
 
 /** Elementos del cuerpo del documento, en orden. `add` acepta elementos sueltos o arreglos y los aplana. */
 const body = [];
@@ -50,20 +34,24 @@ const add = (...xs) => xs.flat().forEach((x) => body.push(x));
  * @param {{after?: number, bold?: boolean, color?: string}} [opts] Espacio posterior (DXA), negrita y color.
  */
 const center = (t, size, opts = {}) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: opts.after ?? 120 }, children: [new TextRun({ text: t, size, bold: opts.bold, color: opts.color })] });
+const field = (label, value) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 },
+  children: [new TextRun({ text: `${label}: `, bold: true, size: 22 }), new TextRun({ text: value, size: 22 })] });
 add(
-  new Paragraph({ spacing: { before: 700 }, children: [] }),
-  center("INSTITUTO POLITÉCNICO NACIONAL", 32, { bold: true }),
-  center("Unidad Profesional Interdisciplinaria de Ingeniería y Ciencias Sociales y Administrativas (UPIICSA)", 22, { after: 600 }),
-  center("Virología y Criptografía · Grupo 6NV68", 26, { after: 900 }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 },
-    children: [new D.ImageRun({ type: "png", data: fs.readFileSync(path.join(__dirname, "logo.png")), transformation: { width: 110, height: 110 } })] }),
-  center("Sistema ABCO", 56, { bold: true, color: L.ACCENT, after: 200 }),
-  center("Cifrado César, esteganografía y un algoritmo propio", 30, { after: 120 }),
-  center("con autenticación de dos factores por imagen-llave", 30, { after: 900 }),
-  center("Documentación técnica · Proyecto del segundo parcial", 24, { after: 1200 }),
-  center("Integrante(s): ____________________________________", 22),
-  center("Profesor(a): ____________________________________", 22, { after: 600 }),
-  center("Octubre de 2026", 22),
+  center("INSTITUTO POLITÉCNICO NACIONAL", 30, { bold: true, after: 60 }),
+  center("Unidad Profesional Interdisciplinaria de Ingeniería y Ciencias Sociales y Administrativas (UPIICSA)", 20, { after: 900 }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 },
+    children: [new D.ImageRun({ type: "png", data: fs.readFileSync(path.join(__dirname, "logo.png")), transformation: { width: 150, height: 150 } })] }),
+  center("ABCO", 64, { bold: true, color: L.ACCENT, after: 120 }),
+  center("Cifrado César, esteganografía y un algoritmo propio", 28, { after: 40 }),
+  center("con autenticación de dos factores por imagen-llave", 28, { after: 160 }),
+  center("Examen 2do parcial", 24, { after: 1000 }),
+  field("Alumno(a)", "______________________________"),
+  field("Materia", "Virología y Criptografía"),
+  field("Grupo", "6NV68"),
+  field("Docente", "Gustavo Martínez Vázquez"),
+  field("Semestre", "2027-1"),
+  new Paragraph({ spacing: { before: 900 }, children: [] }),
+  center("Ciudad de México, octubre de 2026", 22),
 );
 
 // ───────────────────────── Índice ─────────────────────────
@@ -71,32 +59,6 @@ add(
   new Paragraph({ pageBreakBefore: true, children: [new TextRun({ text: "Contenido", bold: true, size: 32, color: L.ACCENT })], spacing: { after: 200 } }),
   new TableOfContents("Contenido", { hyperlink: true, headingStyleRange: "1-3" }),
   P("*Si el índice aparece vacío, en Word usa clic derecho → Actualizar campo (o F9).*", { align: AlignmentType.LEFT }),
-);
-
-// ───────────────────────── 1. Introducción ─────────────────────────
-add(
-  H1("1. Introducción"),
-  P("Este documento describe **ABCO**, un sistema cliente-servidor que trabaja con tres algoritmos de ocultamiento y cifrado: dos algoritmos clásicos (**cifrado César** y **esteganografía**) y uno inventado por el equipo (**ABCO**), que combina a los dos anteriores con álgebra lineal, matemáticas discretas y métodos numéricos."),
-  P("El sistema permite ocultar un mensaje dentro de una imagen PNG, revelarlo con una frase secreta, estudiar y romper el cifrado César, comparar los algoritmos con métricas, y proteger las cuentas con un **segundo factor de autenticación (2FA) basado en una imagen-llave**: un PNG que contiene, oculto con ABCO, un secreto que solo el servidor puede verificar."),
-  H2("1.1 Objetivos"),
-  ...bullets([
-    "Implementar y documentar, paso a paso, dos algoritmos clásicos (César y esteganografía) y un algoritmo propio (ABCO).",
-    "Construir un sistema completo en el que participen **todos** los algoritmos: backend .NET con API REST, cliente web responsivo y aplicación móvil Android (Kotlin).",
-    "Justificar el algoritmo propio con matemáticas discretas, álgebra lineal y métodos numéricos, y **medir** sus propiedades en lugar de suponerlas.",
-    "Declarar con honestidad los límites de cada algoritmo y el modelo de amenaza del sistema.",
-  ]),
-  H2("1.2 Cumplimiento de requisitos"),
-  ...tbl(["Requisito", "Cómo se cumple"], [
-    ["Mínimo 2 algoritmos", "**César** y **esteganografía**, cada uno con funciones propias en el sistema."],
-    ["1 algoritmo inventado", "**ABCO**: Hill 2×2 mod 256 + César dinámico (LCG) + encadenamiento XOR, oculto con esteganografía en un recorrido Fisher–Yates y autenticado con HMAC (sección 6)."],
-    ["Un sistema que trabaje con todos", "Login con imagen-llave (ABCO), Ocultar/Revelar (ABCO o esteganografía clásica), laboratorio César, ofuscación César en la consola admin y comparador con los tres algoritmos."],
-    ["Front-end con login", "Web responsiva y app Android; login con usuario y contraseña, más imagen-llave cuando el usuario activa el 2FA."],
-    ["Backend .NET, REST, cliente-servidor", "ASP.NET Core 10 Web API con SQLite y JWT; la web y Android consumen la misma API."],
-    ["Documentar paso a paso, escenarios, seudocódigo y diagramas de flujo", "Secciones 4 a 7 (algoritmos y autenticación) y 9 (escenarios)."],
-    ["Métodos numéricos, matemáticas discretas, álgebra lineal", "Sección 3 y métricas medidas en la sección 8."],
-    ["Opcional: consola de administrador que muestre la encriptación", "Consola admin web con traza paso a paso de ABCO, mapa de diferencias, gestión de usuarios (contraseñas temporales y roles) y auditoría; la traza también se imprime en la consola del servidor."],
-    ["Puntos adicionales: sistema híbrido web + móvil", "Web responsiva y APK Android firmado, contra el mismo backend."],
-  ], [0.32, 0.68], "Matriz de cumplimiento de la consigna."),
 );
 
 // ───────────────────────── 2. Arquitectura ─────────────────────────
@@ -117,17 +79,6 @@ add(
     ["Users", "Id, Username, PwdHash, PwdSalt, TwoFactorEnabled, KeyTokenHash, Role, CreatedUtc", "La contraseña se guarda con PBKDF2-HMAC-SHA256 (600 000 iteraciones) y sal. Del 2FA solo se guarda **SHA-256 del token**, nunca el token."],
     ["Audit", "Id, UserId, Username, Action, Mode, Bytes, Ms, Ok, Utc", "Bitácora sin secretos; en la consola el usuario se muestra ofuscado con César."],
   ], [0.12, 0.43, 0.45], "Tablas de la base de datos SQLite."),
-  H2("2.2 Estructura del repositorio"),
-  ...code(`Examen_Prisma/
-  src/Prisma.Core/          algoritmos: Caesar, LsbClassic, PrismaKeys, PrismaCipher,
-                            Lcg64/FisherYates, PrismaStego, Metrics, Steganalysis
-  src/Prisma.Api/           API REST + wwwroot (web) + SQLite + JWT
-  tests/Prisma.Core.Tests/  pruebas xUnit y vectores del prototipo
-  tools/prototipo/          prototipo de referencia en Python y generador de vectores
-  tools/Prisma.Metrics/     mide las métricas de este documento
-  android/                  app Kotlin + Jetpack Compose
-  deploy/                   Dockerfile, docker-compose y guía de despliegue
-  docs/                     API, métricas, diagramas, capturas y este documento`),
 );
 
 // ───────────────────────── 3. Fundamentos matemáticos ─────────────────────────
@@ -137,18 +88,10 @@ add(
   ...tbl(["Área", "Dónde se usa", "Evidencia"], [
     ["Matemáticas discretas", "Aritmética modular en ℤ₂₆ (César) y ℤ₂₅₆ (ABCO). Unidades de ℤ₂₅₆: los impares (φ(256) = 128). **Euclides extendido** para inversos. **Teorema de Hull–Dobell** para el periodo del generador congruencial. **Permutaciones** (grupo simétrico Sₙ) con Fisher–Yates. XOR como suma en GF(2). Conteo |GL₂(ℤ₂₅₆)| = 2²⁸·6.", "Pruebas: periodo 256 del LCG, el recorrido no repite posiciones, conteo de GL₂ por fuerza bruta en ℤ₁₆."],
     ["Álgebra lineal", "Cifrado de Hill: producto matriz-vector, determinante, invertibilidad, **matriz adjunta** y A·A⁻¹ = I. Ataque de texto claro conocido A = C·P⁻¹.", "Prueba A·A⁻¹ = I con 2 000 matrices; ataque que recupera la matriz de Hill puro y falla contra ABCO."],
-    ["Métodos numéricos", "**Entropía de Shannon**, **MSE/PSNR**, **χ²** contra frecuencias del español, estimación **Monte Carlo** de la avalancha, función **gamma incompleta regularizada** (serie y fracción continua de Lentz) y **aproximación de Lanczos** de ln Γ para el estegoanálisis.", "Prueba P(1, x) = 1 − e⁻ˣ y Γ(5) = 24; tablas de la sección 8."],
+    ["Métodos numéricos", "**Entropía de Shannon**, **MSE/PSNR**, **χ²** contra frecuencias del español, estimación **Monte Carlo** de la avalancha, función **gamma incompleta regularizada** (serie y fracción continua de Lentz) y **aproximación de Lanczos** de ln Γ para el estegoanálisis.", "Prueba P(1, x) = 1 − e⁻ˣ y Γ(5) = 24 (sección de pruebas)."],
   ], [0.18, 0.52, 0.30], "Justificación matemática."),
   H2("3.1 Aritmética modular y el inverso en ℤ₂₅₆"),
   P("En ℤ₂₅₆ un número x tiene inverso multiplicativo si y solo si mcd(x, 256) = 1, es decir, si x es **impar**. El inverso se obtiene con el algoritmo de Euclides extendido, que encuentra enteros s, t con s·x + t·256 = 1; entonces x⁻¹ ≡ s (mod 256). Por ejemplo, 11·163 = 1793 = 7·256 + 1, así que 11⁻¹ = 163."),
-  ...code(`FUNCIÓN InversoMod(x, m = 256):
-    (r0, r1, s0, s1) ← (x mod m, m, 1, 0)
-    MIENTRAS r1 ≠ 0:
-        q ← r0 div r1
-        (r0, r1) ← (r1, r0 − q·r1)
-        (s0, s1) ← (s1, s0 − q·s1)
-    SI r0 ≠ 1 ENTONCES ERROR "no invertible"
-    DEVOLVER s0 mod m`),
   H2("3.2 Matrices invertibles e inversa por adjunta"),
   P("Una matriz A = [[a, b], [c, d]] sobre ℤ₂₅₆ es invertible si y solo si det(A) = ad − bc es invertible, es decir, impar. Su inversa es A⁻¹ = det(A)⁻¹ · [[d, −b], [−c, a]] (mod 256). El número de matrices invertibles es |GL₂(ℤ₂₅₆)| = 2⁴⁽⁸⁻¹⁾ · |GL₂(ℤ₂)| = 2²⁸ · 6 = 1 610 612 736; la fórmula se verificó por fuerza bruta en ℤ₁₆ (24 576 matrices)."),
   H2("3.3 Generador congruencial y teorema de Hull–Dobell"),
@@ -157,7 +100,7 @@ add(
   ...bullets([
     "**Entropía de Shannon:** H = −Σ pᵢ·log₂ pᵢ, en bits por byte (máximo 8). Un texto en español ronda 4 bits/byte; un buen cifrado se acerca a 8. Para mensajes cortos, el máximo alcanzable es log₂(n), porque n bytes no pueden mostrar los 256 valores.",
     "**PSNR:** 10·log₁₀(255² / MSE) en dB, con MSE = (1/N)·Σ(xᵢ − yᵢ)². Por encima de ~40 dB la diferencia es imperceptible.",
-    "**χ² de Pearson:** Σ (Oᵢ − Eᵢ)² / Eᵢ. En César compara las letras observadas con las esperadas en español; en el estegoanálisis de la sección de métricas compara las frecuencias de los pares de valores (2k, 2k+1).",
+    "**χ² de Pearson:** Σ (Oᵢ − Eᵢ)² / Eᵢ. En César compara las letras observadas con las esperadas en español; en el estegoanálisis compara las frecuencias de los pares de valores (2k, 2k+1).",
   ]),
 );
 
@@ -171,7 +114,7 @@ add(
     "**Ofuscación de caracteres** en la consola de administración: los nombres de usuario se muestran desplazados 13 posiciones sobre los 95 caracteres ASCII imprimibles. Es ofuscación, no cifrado: el botón \"Revelar\" la deshace.",
     "**Pieza interna de ABCO**: el desplazamiento sᵢ que se suma a cada bloque es un César que cambia en cada bloque.",
   ]),
-  H2("4.2 Paso a paso"),
+  H2("Seudocódigo"),
   ...steps([
     "Elegir el alfabeto: A–Z (n = 26) o A–Z con Ñ (n = 27).",
     "Quitar tildes y diéresis (á → a, ü → u) para que ninguna letra escape al cifrado. La Ñ se conserva solo si el alfabeto la incluye.",
@@ -188,21 +131,6 @@ add(
     ["Cifrada", "F", "U", "L", "S", "W", "R", "J", "U", "D", "I", "L", "D"],
   ], null, "Cifrado César de CRIPTOGRAFIA con k = 3."),
   P("Resultado: **FULSWRJUDILD**. (El PDF del curso muestra «FULswrjudild»; la versión correcta, en mayúsculas, es la de la tabla, y la prueba `MaterialExample_CRIPTOGRAFIA` lo verifica.)"),
-  H2("4.4 Seudocódigo"),
-  ...code(`FUNCIÓN CesarCifrar(texto, k, conEñe):
-    alfabeto ← SI conEñe ENTONCES "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ" SI NO "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    n ← |alfabeto|
-    texto ← QuitarTildes(texto, conEñe)
-    salida ← ""
-    PARA cada carácter x EN texto:
-        i ← Posición(Mayúscula(x), alfabeto)
-        SI i = −1 ENTONCES salida ← salida + x            # espacio, dígito, signo
-        SI NO
-            y ← alfabeto[(i + k) mod n]
-            salida ← salida + (SI EsMinúscula(x) ENTONCES Minúscula(y) SI NO y)
-    DEVOLVER salida
-
-FUNCIÓN CesarDescifrar(texto, k, conEñe):  DEVOLVER CesarCifrar(texto, −k, conEñe)`),
   H2("4.5 Diagrama de flujo"),
   ...img(DIAG("cesar"), "Diagrama de flujo del cifrado César.", { maxH: 6.8 }),
   H2("4.6 Ataque: fuerza bruta + χ²"),
@@ -214,13 +142,6 @@ FUNCIÓN CesarDescifrar(texto, k, conEñe):  DEVOLVER CesarCifrar(texto, −k, c
     "χ²(k) = Σ (Oᵢ − Eᵢ)² / Eᵢ.",
     "La clave es la de menor χ². En el sistema, romper un texto de 200 caracteres tarda alrededor de 1 ms.",
   ]),
-  ...code(`FUNCIÓN RomperCesar(C, conEñe):
-    candidatos ← []
-    PARA k ← 0 HASTA n − 1:
-        P ← CesarDescifrar(C, k, conEñe)
-        candidatos.agregar((k, ChiCuadrada(P), P))
-    ORDENAR candidatos POR χ² ASCENDENTE
-    DEVOLVER candidatos[0]`),
   ...img(DIAG("cesar_crack"), "Diagrama de flujo del ataque χ² a César.", { maxH: 6.5 }),
 );
 
@@ -230,10 +151,10 @@ add(
   H2("5.1 Qué es y para qué se usa en el sistema"),
   P("La esteganografía oculta la **existencia** del mensaje. La técnica usada reemplaza el bit menos significativo de los bytes de una imagen por los bits del mensaje: el valor de cada canal cambia como mucho en 1/255, lo cual es invisible. El sistema la usa de dos formas:"),
   ...bullets([
-    "**Esteganografía clásica** (Ocultar/Revelar): bits menos significativos en orden y **sin clave**. Sirve para demostrar que cualquiera puede leer el mensaje (escenario E2).",
-    "**Capa de transporte de ABCO**: el cifrado de ABCO se escribe en los bits menos significativos, pero en un orden secreto (sección 6.6).",
+    "**Esteganografía clásica** (Ocultar/Revelar): bits menos significativos en orden y **sin clave**. Sirve para demostrar que cualquiera puede leer el mensaje.",
+    "**Capa de transporte de ABCO**: el cifrado de ABCO se escribe en los bits menos significativos, pero en un orden secreto (sección 5.6).",
   ]),
-  H2("5.2 Paso a paso (modo clásico)"),
+  H2("Seudocódigo"),
   ...steps([
     "Normalizar la imagen a RGB de 8 bits: N = ancho × alto × 3 canales, en orden R, G, B por fila.",
     "Formar la trama: longitud del mensaje (4 bytes, big-endian) seguida del mensaje en UTF-8.",
@@ -249,28 +170,8 @@ add(
     ["Reemplazar el bit menos significativo", "0110100**1**₂"],
     ["Canal modificado", "105 (cambio de 1/255, invisible)"],
   ], [0.4, 0.6], "Inserción de un bit en el bit menos significativo."),
-  H2("5.4 Seudocódigo"),
-  ...code(`FUNCIÓN EstegoOcultar(imagen, mensaje):
-    canales ← NormalizarRGB(imagen)
-    trama ← EnteroBigEndian(|mensaje|, 4 bytes) ‖ UTF8(mensaje)
-    bits ← BitsMSBPrimero(trama)
-    SI |bits| > |canales| ENTONCES ERROR "no cabe"
-    PARA j ← 0 HASTA |bits| − 1:
-        canales[j] ← (canales[j] AND 0xFE) OR bits[j]
-    DEVOLVER CodificarPNG(canales)
-
-FUNCIÓN EstegoExtraer(imagen):
-    canales ← NormalizarRGB(imagen)
-    L ← Bytes(bit menos significativo de canales[0..31])
-    SI L < 0 O L > capacidad ENTONCES ERROR "no hay mensaje legible"
-    DEVOLVER Bytes(bit menos significativo de canales[32 .. 32 + 8L − 1])`),
+  H2("Diagrama de flujo"),
   ...img(DIAG("lsb_clasico"), "Diagrama de flujo de la esteganografía clásica (ocultar).", { maxH: 6.5 }),
-  H2("5.5 Límites"),
-  ...bullets([
-    "Sin clave: cualquiera que lea los bits menos significativos en orden obtiene el mensaje.",
-    "Escribe al inicio de la imagen: el ataque χ² de Westfeld–Pfitzmann lo detecta en esa región en cuanto se llena (sección 8).",
-    "Cualquier recompresión con pérdida (por ejemplo, JPEG) destruye el mensaje.",
-  ]),
 );
 
 // ───────────────────────── 6. ABCO ─────────────────────────
@@ -320,7 +221,7 @@ add(
   ]),
   ...img(DIAG("prisma_bloque"), "Cifrado por bloques de ABCO.", { maxH: 6.6 }),
   ...img(DIAG("prisma_descifrar"), "Descifrado por bloques de ABCO.", { maxH: 5.8 }),
-  H2("6.5 Ejemplo resuelto a mano"),
+  H2("Ejemplo"),
   P("Datos: A = [[3, 2], [5, 7]], s₀ = 7, a = 5, c = 3, C₀ = (10, 20). Mensaje **\"Hi\"** = (72, 105). Este ejemplo está verificado por la prueba `HandWorkedExample_Hi`."),
   ...tbl(["Paso", "Cálculo", "Resultado"], [
     ["det(A)", "3·7 − 2·5 = 11 (impar ✔)", "11"],
@@ -357,65 +258,68 @@ add(
   ...img(DIAG("fisher_yates"), "Fisher–Yates con muestreo con rechazo.", { maxH: 6.6 }),
   ...img(DIAG("prisma_ocultar"), "ABCO: ocultar un mensaje.", { maxH: 7.2 }),
   ...img(DIAG("prisma_revelar"), "ABCO: revelar un mensaje.", { maxH: 7.2 }),
-  H2("6.7 Seudocódigo completo"),
-  ...code(`FUNCIÓN DerivarClaves(frase, sal):
-    K ← PBKDF2_HMAC_SHA256(UTF8(frase), sal, 100000, 32)
-    ctr ← 0
-    REPETIR
-        h ← SHA256(K ‖ "hill" ‖ ctr);  A ← [[h0, h1], [h2, h3]];  ctr ← ctr + 1
-    HASTA QUE Det(A) es impar
-    s0 ← K[4];  a ← 4·(K[5] mod 63 + 1) + 1;  c ← 2·(K[6] mod 128) + 1
-    C0 ← (K[7], K[8]);  semilla ← LittleEndian64(K[16..23]);  kmac ← SHA256(K ‖ "mac")
-    DEVOLVER (A, InversaAdjunta(A), s0, a, c, C0, semilla, kmac)
-
-FUNCIÓN CifrarABCO(P, claves):
-    SI |P| impar ENTONCES P ← P ‖ 0
-    prev ← C0;  s ← s0;  C ← []
-    PARA i ← 0 HASTA |P| − 1 PASO 2:
-        s ← (a·s + c) mod 256
-        X ← (P[i] ⊕ prev1, P[i+1] ⊕ prev2)
-        Y ← A·X mod 256
-        prev ← ((Y1 + s) mod 256, (Y2 + s) mod 256);  C ← C ‖ prev
-    DEVOLVER C
-
-FUNCIÓN DescifrarABCO(C, claves):
-    prev ← C0;  s ← s0;  P ← []
-    PARA i ← 0 HASTA |C| − 1 PASO 2:
-        s ← (a·s + c) mod 256
-        X ← A⁻¹ · ((C[i] − s) mod 256, (C[i+1] − s) mod 256) mod 256
-        P ← P ‖ (X1 ⊕ prev1, X2 ⊕ prev2);  prev ← (C[i], C[i+1])
-    DEVOLVER P
-
-FUNCIÓN Ocultar(imagen, mensaje, frase):
-    canales ← NormalizarRGB(Reducir(imagen, 1280))
-    sal ← Aleatorio(16);  claves ← DerivarClaves(frase, sal)
-    C ← CifrarABCO(UTF8(mensaje), claves)
-    trama ← BigEndian32(|mensaje|) ‖ C ‖ HMAC_SHA256(kmac, C)[0..7]
-    SI 8·|trama| > |canales| − 128 ENTONCES ERROR "no cabe"
-    PARA i ← 0 HASTA 127:  canales[i].bitMenor ← bit i de sal
-    R ← FisherYates([128 .. |canales| − 1], semilla)
-    PARA j ← 0 HASTA 8·|trama| − 1:  canales[R[j]].bitMenor ← bit j de trama
-    DEVOLVER CodificarPNG(canales)
-
-FUNCIÓN Revelar(imagen, frase):
-    canales ← NormalizarRGB(imagen)
-    sal ← BitsMenosSignificativos(canales[0..127]);  claves ← DerivarClaves(frase, sal)
-    R ← FisherYates([128 .. |canales| − 1], semilla)
-    L ← BigEndian32(bits menos significativos por R, bits 0..31)
-    SI L < 0 O L > capacidad ENTONCES ERROR genérico
-    C, T ← leer los bits siguientes por R
-    SI NO IgualTiempoConstante(T, HMAC_SHA256(kmac, C)[0..7]) ENTONCES ERROR genérico
-    DEVOLVER DescifrarABCO(C, claves)[0..L − 1]
-
-FUNCIÓN FisherYates(lista, semilla):
-    x ← semilla
-    PARA i ← |lista| − 1 HASTA 1 PASO −1:
-        REPETIR
-            x ← (x·6364136223846793005 + 1442695040888963407) mod 2⁶⁴
-            v ← x div 2³²
-        HASTA QUE v < ⌊2³² / (i+1)⌋·(i+1)              # muestreo con rechazo
-        j ← v mod (i+1);  Intercambiar(lista[i], lista[j])
-    DEVOLVER lista`),
+  H2("Seudocódigo completo"),
+  P("Cada función del algoritmo, en pasos numerados."),
+  H3("Derivar claves (frase, sal)"),
+  ...steps([
+    "Calcular K = PBKDF2-HMAC-SHA256(frase en UTF-8, sal, 100 000 iteraciones, 32 bytes).",
+    "Iniciar el contador ctr en 0.",
+    "Calcular h = SHA-256(K ‖ \"hill\" ‖ ctr) y formar la matriz A = [[h₀, h₁], [h₂, h₃]].",
+    "Si det(A) es par, aumentar ctr en 1 y volver al paso 3 (muestreo con rechazo).",
+    "Calcular la inversa A⁻¹ = det(A)⁻¹ · adj(A) mod 256.",
+    "Tomar s₀ = K[4], a = 4·(K[5] mod 63 + 1) + 1 y c = 2·(K[6] mod 128) + 1.",
+    "Tomar C₀ = (K[7], K[8]), la semilla = K[16..23] (little-endian) y k_mac = SHA-256(K ‖ \"mac\").",
+    "Devolver (A, A⁻¹, s₀, a, c, C₀, semilla, k_mac).",
+  ]),
+  H3("Cifrar (mensaje P, claves)"),
+  ...steps([
+    "Si P tiene longitud impar, agregar un byte 0 al final.",
+    "Iniciar prev = C₀, s = s₀ y el cifrado C vacío.",
+    "Tomar el siguiente par de bytes (P[i], P[i+1]), con i = 0, 2, 4, …",
+    "Actualizar el desplazamiento: s = (a·s + c) mod 256.",
+    "Encadenar con el bloque anterior: X = (P[i] ⊕ prev₁, P[i+1] ⊕ prev₂).",
+    "Aplicar la matriz: Y = A·X mod 256.",
+    "Desplazar: Cᵢ = ((Y₁ + s) mod 256, (Y₂ + s) mod 256); agregar Cᵢ a C y hacer prev = Cᵢ.",
+    "Si quedan pares, volver al paso 3; si no, devolver C.",
+  ]),
+  H3("Descifrar (cifrado C, claves)"),
+  ...steps([
+    "Iniciar prev = C₀, s = s₀ y el mensaje P vacío.",
+    "Tomar el siguiente par (C[i], C[i+1]) y actualizar s = (a·s + c) mod 256.",
+    "Quitar el desplazamiento y la matriz: X = A⁻¹ · ((C[i] − s) mod 256, (C[i+1] − s) mod 256) mod 256.",
+    "Deshacer el encadenamiento: agregar (X₁ ⊕ prev₁, X₂ ⊕ prev₂) a P y hacer prev = (C[i], C[i+1]).",
+    "Si quedan pares, volver al paso 2; si no, devolver P.",
+  ]),
+  H3("Ocultar (imagen, mensaje, frase)"),
+  ...steps([
+    "Reducir la imagen si mide más de 1 280 px por lado y normalizarla a canales RGB de 8 bits (N canales).",
+    "Generar una sal aleatoria de 16 bytes y derivar las claves con la frase.",
+    "Cifrar el mensaje en UTF-8: C = Cifrar(mensaje, claves).",
+    "Formar la trama: longitud del mensaje (4 bytes, big-endian) ‖ C ‖ HMAC-SHA256(k_mac, C)[0..7].",
+    "Si 8·|trama| > N − 128, terminar con el error «el mensaje no cabe».",
+    "Escribir los 128 bits de la sal en el bit menos significativo de los canales 0..127.",
+    "Calcular el recorrido R = Fisher–Yates([128, …, N − 1], semilla).",
+    "Escribir el bit j de la trama en el bit menos significativo del canal R[j].",
+    "Codificar la imagen como PNG y devolverla.",
+  ]),
+  H3("Revelar (imagen, frase)"),
+  ...steps([
+    "Normalizar la imagen a canales RGB de 8 bits.",
+    "Leer la sal de los canales 0..127 y derivar las claves con la frase.",
+    "Calcular el recorrido R con la semilla.",
+    "Leer la longitud L (4 bytes) siguiendo R; si es negativa o no cabe, terminar con el error genérico.",
+    "Leer el cifrado C y la etiqueta T siguiendo R.",
+    "Comparar T con HMAC-SHA256(k_mac, C)[0..7] en tiempo constante; si no coinciden, terminar con el error genérico.",
+    "Descifrar C y devolver los primeros L bytes.",
+  ]),
+  H3("Fisher–Yates (lista, semilla)"),
+  ...steps([
+    "Iniciar el generador con x = semilla y tomar i = |lista| − 1.",
+    "Avanzar el generador: x = (x·6364136223846793005 + 1442695040888963407) mod 2⁶⁴ y tomar v = x div 2³².",
+    "Si v ≥ ⌊2³² / (i+1)⌋·(i+1), volver al paso 2 (muestreo con rechazo, para no sesgar el módulo).",
+    "Calcular j = v mod (i+1) e intercambiar lista[i] con lista[j].",
+    "Restar 1 a i; si i > 0, volver al paso 2. Al terminar, devolver la lista.",
+  ]),
   H2("6.8 Traza real del sistema"),
   P("Con el modo demo activo, cada operación ABCO deja una traza que se ve en la consola de administración y se imprime en la consola del servidor. Esta es la traza real de ocultar \"Hola Bob, nos vemos a las 18:00\" en `oceano.png` con la frase `girasol-azul-42` (el bloque 0 se puede verificar a mano: 72 ⊕ 167 = 239, 70·239 + 245·152 = 53 970 ≡ 210, (197·136 + 111) mod 256 = 23 y 210 + 23 = 233):"),
   ...code(traza),
@@ -481,90 +385,48 @@ add(
   P("Hay dos roles: **usuario** y **administrador**. En **Admin → Usuarios**, un administrador puede hacer administrador a un usuario o quitarle el rol. El servidor no permite que un administrador se quite el rol a sí mismo ni que el sistema se quede sin administradores (responde 409). Los cambios quedan en la auditoría, identificando al usuario afectado por su número y no por su nombre."),
 );
 
-// ───────────────────────── 8. Métricas ─────────────────────────
-add(
-  H1("8. Métricas medidas"),
-  P("Todas las cifras de esta sección las produce la herramienta `tools/Prisma.Metrics`, que ejecuta la implementación real de `Prisma.Core`. Ninguna es una estimación teórica. Se regeneran con `dotnet run --project tools/Prisma.Metrics -c Release`. Los tiempos dependen de la carga del equipo y sirven para comparar órdenes de magnitud, no como referencia absoluta."),
-  ...markdown(metricas),
-  H2("8.1 Interpretación"),
-  ...bullets([
-    "**Entropía:** César deja la entropía exactamente igual que el texto claro (solo renombra símbolos); ABCO la lleva casi al máximo (cerca de 8 bits/byte).",
-    "**Ataque de texto claro conocido:** con 2 bloques conocidos se recupera la matriz de un Hill puro y se predicen todos los bloques nuevos; contra ABCO el mismo ataque no acierta ninguno.",
-    "**Sensibilidad a la clave:** cambiar una sola letra de la frase cambia ≈ 50 % de los bits, gracias a PBKDF2.",
-    "**Difusión:** es el punto débil declarado: el cambio se propaga hacia adelante, no a todo el mensaje.",
-    "**Esteganografía:** con mensajes de hasta decenas de KB, el PSNR supera 54 dB (imperceptible) y el χ² no detecta ABCO; con la imagen casi llena, cualquier ocultamiento por reemplazo del bit menos significativo se vuelve detectable.",
-  ]),
-);
-
-// ───────────────────────── 9. Escenarios ─────────────────────────
+// ───────────────────────── Pantallas ─────────────────────────
 /**
- * Escenario de uso: subtítulo, tabla con actores, precondiciones, resultado esperado y evidencia, y
- * la lista numerada de pasos.
- * @param {string} id Identificador (E1, E2…).
- * @param {string} title Título del escenario.
- * @param {string} actors Actores.
- * @param {string} pre Precondiciones.
- * @param {string[]} stepsList Pasos.
- * @param {string} expected Resultado esperado.
- * @param {string} evidence Evidencia.
- * @returns {Array} Elementos para `add`.
+ * Una pantalla: subtítulo, descripción breve y la captura con su pie de figura.
+ * @param {string} title Nombre de la pantalla.
+ * @param {string} file Archivo en docs/capturas.
+ * @param {string} text Qué muestra y qué se puede hacer en ella.
+ * @param {object} [size] Tamaño máximo de la imagen en pulgadas ({ maxW, maxH }).
  */
-const scenario = (id, title, actors, pre, stepsList, expected, evidence) => [
-  H2(`${id}. ${title}`),
-  ...tbl(["Elemento", "Descripción"], [
-    ["Actores", actors], ["Precondiciones", pre], ["Resultado esperado", expected], ["Evidencia", evidence],
-  ], [0.22, 0.78]),
-  P("**Pasos:**", { align: AlignmentType.LEFT }),
-  ...steps(stepsList),
+const screen = (title, file, text, size) => [
+  new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(title)], keepNext: true, keepLines: true }),
+  P(text, { para: { keepNext: true, keepLines: true } }),   // título, texto e imagen siempre en la misma página
+  ...img(SHOT(file), title + ".", size),
 ];
+const WEB = { maxW: 6.0, maxH: 3.45 }, PHONE = { maxW: 2.9, maxH: 5.2 }, PHONE_WIDE = { maxW: 6.3, maxH: 3.2 };
 add(
-  H1("9. Escenarios"),
-  P("Los actores siguen la convención clásica de la criptografía: **Alice** y **Bob** son los participantes legítimos, **Eve** es el atacante pasivo que escucha y **Mallory** el atacante activo que modifica mensajes."),
-  ...scenario("E1", "Mensaje oculto entre dos personas", "Alice (emisora), Bob (receptor), Eve (intercepta la imagen).",
-    "Alice y Bob acordaron una frase por otro medio. Ambos tienen cuenta en ABCO.",
-    ["Alice abre **Ocultar**, elige la imagen \"Atardecer\", escribe el mensaje y la frase, y pulsa **Ocultar en la imagen**.",
-      "El sistema muestra la imagen resultante con PSNR ≈ 82 dB y la descarga como PNG.",
-      "Alice envía el PNG a Bob **como archivo**.",
-      "Bob abre **Revelar**, carga el PNG, escribe la frase y obtiene el mensaje.",
-      "Eve intercepta el PNG: a simple vista es una foto normal y, sin la frase, no puede extraer nada."],
-    "Bob lee el mensaje; Eve solo ve una imagen.", "Figuras de Ocultar y Revelar (sección 11) y tabla de integridad (sección 8)."),
-  ...img(SHOT("web_03_ocultar.jpg"), "E1: Alice oculta el mensaje (ABCO, PSNR 81.66 dB)."),
-  ...img(SHOT("web_04_revelar.jpg"), "E1: Bob revela el mensaje con la frase correcta."),
-  ...scenario("E2", "Esteganografía clásica frente a ABCO", "Eve, con un extractor que lee los bits menos significativos en orden.",
-    "Eve tiene una imagen con mensaje en modo clásico y otra en modo ABCO.",
-    ["Eve extrae la imagen clásica con **Revelar → Esteganografía clásica**: obtiene el mensaje completo sin ninguna clave.",
-      "Eve intenta lo mismo con la imagen ABCO: el sistema responde que la lectura secuencial no produce un mensaje legible y muestra los bytes que leyó, que parecen ruido aleatorio.",
-      "Eve intenta revelar la imagen ABCO con una frase incorrecta: recibe el error genérico."],
-    "El modo clásico no protege nada; ABCO sí.", "Figura del error genérico y prueba `Classic_IsReadableByAnyone_PrismaIsNot`."),
-  ...img(SHOT("web_05_revelar_error.jpg"), "E2: frase incorrecta → error genérico y lo que vería un atacante."),
-  ...scenario("E3", "Alteración de la imagen", "Mallory (modifica la imagen en tránsito).",
-    "Una imagen con mensaje ABCO.",
-    ["Mallory cambia un solo bit de un canal que forma parte de la trama.",
-      "Bob intenta revelar con la frase correcta.",
-      "El HMAC no coincide y el sistema rechaza la imagen con el error genérico.",
-      "Si Mallory toca un canal que la trama no usa, el mensaje sigue intacto (la marca no es frágil fuera de la trama)."],
-    "Cualquier alteración de la trama o de la sal se detecta.", "Tabla \"Integridad y robustez\" de la sección 8 y prueba `Prisma_WrongPassphraseOrTamperingGivesGenericError`."),
-  ...scenario("E4", "Inicio de sesión con imagen-llave", "Alicia (usuaria) y un atacante que robó su contraseña.",
-    "Alicia activó el 2FA y guardó `llave_alicia.png`.",
-    ["Alicia escribe usuario y contraseña: el sistema responde \"Contraseña correcta. Ahora carga tu imagen-llave\".",
-      "Alicia selecciona `llave_alicia.png` y pulsa **Verificar imagen-llave**: entra al sistema.",
-      "El atacante, con la contraseña pero con otra imagen, recibe 401 \"La imagen-llave no es válida para este usuario\".",
-      "Con la imagen correcta y una contraseña equivocada, recibe 401 \"Usuario o contraseña incorrectos\"."],
-    "Solo entra quien tiene **ambos** factores.", "Figuras del login en dos pasos y de la activación; registros de la auditoría."),
-  ...img(SHOT("web_13_login_2fa.jpg"), "E4: segundo paso del login (imagen-llave)."),
-  ...scenario("E5", "Ruptura de César", "Eve, con el laboratorio César.",
-    "Un texto en español cifrado con César (k = 11).",
-    ["Eve pega el texto cifrado en el laboratorio y pulsa **Romper (χ²)**.",
-      "El sistema descifra con las 26 claves, calcula χ² contra las frecuencias del español y las ordena.",
-      "La clave con menor χ² (k = 11, χ² = 12.98) recupera el texto en menos de un milisegundo."],
-    "César se rompe de inmediato; por eso el sistema nunca lo usa para proteger contraseñas.", "Figura del laboratorio César."),
-  ...img(SHOT("web_06_cesar.jpg"), "E5: César roto con χ²; la clave correcta destaca sobre las demás."),
-  ...scenario("E6", "Recompresión por una app de mensajería", "Alice (envía la imagen \"como foto\").",
-    "Una imagen con mensaje ABCO.",
-    ["Alice comparte el PNG por una app que lo convierte a JPEG.",
-      "Bob intenta revelar el mensaje.",
-      "La compresión con pérdida cambió ≈ 50 % de los bits menos significativos; el HMAC falla y el sistema muestra el error genérico."],
-    "Falla esperada y documentada. Mitigación: enviar siempre **como archivo** (la web y la app lo advierten).", "Tabla \"Integridad y robustez\" de la sección 8 (JPEG calidad 90 y 100)."),
+  H1("Pantallas (Interfaz web)"),
+  P("La interfaz web se sirve desde el mismo servidor y funciona en computadora y en teléfono. Todas las capturas se tomaron del sistema en ejecución; salvo la última, en tema claro."),
+  ...screen("Inicio de sesión", "web_01_login.jpg", "Usuario y contraseña, con botón para mostrar u ocultar la contraseña, enlace para crear cuenta y «¿Olvidaste tu contraseña?». La barra superior muestra el logo y el botón de tema.", WEB),
+  ...screen("¿Olvidaste tu contraseña?", "web_02_olvide.jpg", "Al pulsar el enlace aparece el aviso para contactar al administrador, quien genera una contraseña temporal.", WEB),
+  ...screen("Inicio de sesión con imagen-llave", "web_13_login_2fa.jpg", "Si la cuenta tiene el segundo factor activado, después de la contraseña se pide la imagen-llave (llave.png).", WEB),
+  ...screen("Cambio obligatorio de contraseña", "web_11_cambiar.jpg", "Quien entra con una contraseña temporal solo ve esta pantalla hasta elegir una nueva; el servidor bloquea las demás rutas.", WEB),
+  ...screen("Ocultar mensaje", "web_03_ocultar.jpg", "Se elige la portadora (catálogo o imagen propia), se escribe el mensaje, se elige ABCO o la esteganografía clásica y la frase. El resultado muestra la imagen, el PSNR, los bytes usados y el botón para descargar el PNG.", WEB),
+  ...screen("Revelar mensaje", "web_04_revelar.jpg", "Se carga el PNG recibido, se elige el modo y se escribe la frase; el sistema muestra el mensaje oculto.", WEB),
+  ...screen("Revelar con frase incorrecta", "web_05_revelar_error.jpg", "Con una frase equivocada o una imagen alterada, el sistema responde con un error genérico y muestra los bytes que leería un atacante, que parecen ruido.", WEB),
+  ...screen("Laboratorio César", "web_06_cesar.jpg", "Cifra, descifra y rompe textos con César. Al romper, prueba todas las claves y las ordena por χ²; la correcta queda primero.", WEB),
+  ...screen("Comparador", "web_07_comparador.jpg", "El mismo mensaje con César, esteganografía clásica y ABCO: bytes de salida, tiempo, entropía y si se detecta una alteración.", WEB),
+  ...screen("Cuenta y segundo factor", "web_12_cuenta_2fa.jpg", "Datos de la cuenta, cambio de contraseña y activación del 2FA: al activarlo se descarga la imagen-llave generada.", WEB),
+  ...screen("Consola de administración", "web_08_admin.jpg", "Traza paso a paso de la última operación ABCO (matriz, desplazamientos, bloques y recorrido) y mapa de diferencias entre la imagen original y la imagen con el mensaje.", WEB),
+  ...screen("Administración de usuarios", "web_10_usuarios.jpg", "Usuarios con el nombre ofuscado con César y botón para revelarlo. Acciones: restablecer contraseña, hacer o quitar administrador y restablecer el 2FA.", WEB),
+  ...screen("Contraseña temporal", "web_09_temporal.jpg", "Al restablecer una contraseña, el administrador ve la temporal una sola vez, con botón para copiarla.", WEB),
+  ...screen("Tema oscuro", "web_14_oscuro.jpg", "El botón de la barra superior alterna entre tema automático (sigue al sistema), claro y oscuro.", WEB),
+  H1("Pantallas (Aplicación móvil)"),
+  P("Capturas de la app Android tomadas en un teléfono real con Android 11, conectado al servidor de la red local."),
+  ...screen("Inicio de sesión", "android_01_login.jpg", "Logo, usuario y contraseña, «¿Olvidaste tu contraseña?» y el botón de ajustes para elegir el tema y la URL del servidor.", PHONE),
+  ...screen("Cambio obligatorio de contraseña", "android_08_cambiar.jpg", "Igual que en la web: tras entrar con una contraseña temporal hay que elegir una nueva antes de continuar.", PHONE),
+  ...screen("Ocultar mensaje", "android_02_ocultar.jpg", "Catálogo de portadoras, galería, selector de modo (ABCO o esteganografía clásica) y la barra de navegación inferior.", PHONE),
+  ...screen("Ocultar mensaje en horizontal", "android_03_ocultar_horizontal.jpg", "En pantallas anchas la navegación pasa a un riel lateral y las tarjetas se reparten en dos columnas.", PHONE_WIDE),
+  ...screen("Revelar mensaje con el teclado abierto", "android_04_revelar_teclado.jpg", "La pantalla se desplaza para que el campo de la frase quede visible sobre el teclado.", PHONE),
+  ...screen("Administración", "android_05_admin.jpg", "Usuarios con nombre ofuscado y sus acciones, visible solo para administradores.", PHONE),
+  ...screen("Administración en horizontal", "android_06_admin_horizontal.jpg", "Usuarios y auditoría lado a lado.", PHONE_WIDE),
+  ...screen("Contraseña temporal", "android_07_temporal.jpg", "La contraseña temporal generada, con botón para copiarla.", PHONE),
+  ...screen("Cuenta en tema oscuro", "android_09_cuenta_oscuro.jpg", "Perfil, selector de tema (automático, claro u oscuro) y cambio de contraseña.", PHONE),
 );
 
 // ───────────────────────── 10. API ─────────────────────────
@@ -606,15 +468,7 @@ add(
     "**¿Olvidaste tu contraseña?:** en el inicio de sesión; indica contactar al administrador.",
     "**Admin** (solo administradores): traza de ABCO, mapa de diferencias, usuarios (revelar nombre, restablecer contraseña, cambiar rol, restablecer 2FA) y auditoría.",
   ]),
-  ...img(SHOT("web_01_login.jpg"), "Web: inicio de sesión con el logo del panda, botón Mostrar contraseña y enlace «¿Olvidaste tu contraseña?»."),
-  ...img(SHOT("web_02_olvide.jpg"), "Web: mensaje al pulsar «¿Olvidaste tu contraseña?»."),
-  ...img(SHOT("web_07_comparador.jpg"), "Web: comparador con César, esteganografía clásica y ABCO."),
-  ...img(SHOT("web_12_cuenta_2fa.jpg"), "Web: 2FA activado y la imagen-llave generada."),
-  ...img(SHOT("web_08_admin.jpg"), "Web: consola de administración (traza y mapa de diferencias)."),
-  ...img(SHOT("web_10_usuarios.jpg"), "Web: usuarios con nombre ofuscado y acciones (restablecer contraseña, cambiar rol, restablecer 2FA)."),
-  ...img(SHOT("web_09_temporal.jpg"), "Web: contraseña temporal generada por el administrador (se muestra una sola vez)."),
-  ...img(SHOT("web_11_cambiar.jpg"), "Web: cambio obligatorio al entrar con la contraseña temporal."),
-  ...img(SHOT("web_14_oscuro.jpg"), "Web: tema oscuro."),
+  P("Las capturas de cada pantalla están en el capítulo «Pantallas (Interfaz web)»."),
   H2("11.2 App Android"),
   ...steps([
     "Instalar `ABCO.apk`: en el teléfono, permitir la instalación desde el origen (navegador o administrador de archivos) y abrir el APK.",
@@ -634,10 +488,7 @@ add(
   ], [0.2, 0.8], "Pantallas de la app Android."),
   P("**Diseño adaptativo.** Con menos de 600 dp de ancho (teléfono en vertical) la navegación va en una barra inferior; con 600 dp o más (teléfono en horizontal, tabletas) pasa a un riel lateral con desplazamiento propio, de modo que los seis destinos nunca se desbordan aunque la pantalla sea baja (en alturas menores a 480 dp solo el destino seleccionado muestra su etiqueta). El contenido decide su distribución por el ancho disponible: en pantallas anchas las tarjetas del formulario se reparten en dos columnas y, al haber resultado, se muestra formulario | resultado, hasta un ancho máximo de 1 200 dp. Los contenedores con desplazamiento reservan el espacio del teclado y llevan el campo enfocado a la vista. Los selectores segmentados usan una sola línea que reduce su tamaño si no cabe, así funcionan también con la fuente del sistema agrandada."),
   P("**Tema.** En Cuenta (y en los ajustes del inicio de sesión) se elige **Automático**, **Claro** u **Oscuro**; Automático sigue al teléfono. La paleta es la misma que la de la web: verde de terminal como acento y carbón y gris acero como neutros, tomados del logo."),
-  ...(androidShots.length
-    ? androidShots.flatMap((f) => img(SHOT(f), androidCaptions[f] || "App Android.",
-        f.includes("horizontal") ? { maxW: 6.3, maxH: 3.4 } : { maxW: 3.0, maxH: 5.4 }))
-    : []),
+  P("Las capturas de la app están en el capítulo «Pantallas (Aplicación móvil)»."),
 );
 
 // ───────────────────────── 12. Despliegue ─────────────────────────
@@ -670,7 +521,7 @@ add(
   P("El proyecto `tests/Prisma.Core.Tests` contiene **29 pruebas xUnit**, todas en verde. Se agrupan así:"),
   ...tbl(["Grupo", "Qué verifica"], [
     ["Vectores del prototipo (3 casos)", "C# = Python: matriz, inversa, s₀, a, c, C₀, semilla, k_mac, cifrado, primeros valores del LCG y del recorrido."],
-    ["Ejemplo \"Hi\"", "El ejemplo resuelto a mano de la sección 6.5."],
+    ["Ejemplo \"Hi\"", "El ejemplo resuelto a mano de la sección 5.5."],
     ["Matemáticas", "A·A⁻¹ = I en 2 000 matrices; |GL₂(ℤ₁₆)| = 24 576; periodo 256 del LCG; el recorrido es una permutación; gamma incompleta y ln Γ."],
     ["Cifrado", "Ida y vuelta de 500 mensajes; bloques iguales → cifrados distintos; entropía de César vs. ABCO."],
     ["César", "CRIPTOGRAFIA → FULSWRJUDILD; HOLA → KROD; ida y vuelta con y sin Ñ; χ² encuentra la clave; ofuscación; las tildes no se filtran."],
@@ -684,7 +535,7 @@ add(
 add(
   H1("14. Límites y modelo de amenaza"),
   ...bullets([
-    "**ABCO es didáctico.** Para proteger datos reales debe usarse un cifrador estándar y auditado. Las métricas de la sección 8 muestran tanto sus fortalezas como su difusión limitada.",
+    "**ABCO es didáctico.** Para proteger datos reales debe usarse un cifrador estándar y auditado. La sección «Lo que ABCO no es» (5.10) resume sus límites.",
     "**Servidor de confianza.** El mensaje y la frase viajan por HTTPS y el servidor los procesa en memoria sin guardarlos; quien controle el servidor podría verlos. Es el modelo habitual de los servicios web de cifrado de archivos.",
     "**Detectabilidad.** Todo ocultamiento por reemplazo del bit menos significativo es detectable estadísticamente con ocupación alta. El recorrido secreto impide **extraer** el mensaje, no ocultar que la imagen fue modificada.",
     "**Fragilidad.** Recompresión, redimensionado o capturas de pantalla destruyen el mensaje y la imagen-llave.",
@@ -724,7 +575,7 @@ add(
 const doc = new Document({
   creator: "Equipo ABCO",
   title: "Documentación del sistema ABCO",
-  description: "Virología y Criptografía · UPIICSA–IPN",
+  description: "Virología y Criptografía · 6NV68 · UPIICSA–IPN",
   features: { updateFields: true },
   styles: {
     default: { document: { run: { font: L.FONT, size: 21 } } },
@@ -742,7 +593,7 @@ const doc = new Document({
     properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }, titlePage: true },
     headers: {
       default: new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "DDDBEE", space: 4 } },
-        children: [new TextRun({ text: "ABCO · Virología y Criptografía · UPIICSA–IPN", size: 16, color: "777777" })] })] }),
+        children: [new TextRun({ text: "ABCO · Virología y Criptografía · 6NV68", size: 16, color: "777777" })] })] }),
       first: new Header({ children: [new Paragraph({ children: [] })] }),
     },
     footers: {
