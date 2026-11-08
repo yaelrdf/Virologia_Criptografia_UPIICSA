@@ -1,0 +1,2 @@
+# APK de distribución (se genera con ./gradlew :app:assembleRelease)
+dist/

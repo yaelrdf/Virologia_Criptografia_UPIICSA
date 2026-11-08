@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Página única del cliente web de ABCO: barra superior, navegación y el contenedor #app donde app.js pinta las vistas. -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>ABCO</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <script>
+    // Aplica el tema elegido antes de pintar, para evitar un parpadeo.
+    try { const t = localStorage.getItem("abco.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch { }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/ocultar" aria-label="ABCO inicio">
+      <img src="logo.png" alt="" width="34" height="34">
+      <span>ABCO</span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menú" aria-expanded="false">☰</button>
+    <nav id="nav" class="nav" hidden>
+      <a href="#/ocultar">Ocultar</a>
+      <a href="#/revelar">Revelar</a>
+      <a href="#/cesar">César</a>
+      <a href="#/comparador">Comparador</a>
+      <a href="#/cuenta">Cuenta</a>
+      <a href="#/admin" data-admin hidden>Admin</a>
+      <button class="link" id="logoutBtn">Salir</button>
+    </nav>
+    <button class="theme-btn" id="themeBtn" type="button" title="Cambiar tema">Tema: automático</button>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="dialog"></dialog>
+  <script src="app.js"></script>
+</body>
+</html>

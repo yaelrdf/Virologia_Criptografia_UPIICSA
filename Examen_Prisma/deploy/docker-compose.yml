@@ -1,0 +1,16 @@
+# Prueba local del contenedor:  docker compose -f deploy/docker-compose.yml up --build
+services:
+  prisma:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      Jwt__Key: ${JWT_KEY:?Define JWT_KEY (al menos 32 caracteres)}
+      Admin__Password: ${ADMIN_PASSWORD:?Define ADMIN_PASSWORD (al menos 8 caracteres)}
+      Demo__Trace: "true"
+    volumes:
+      - prisma-data:/app/data
+volumes:
+  prisma-data:

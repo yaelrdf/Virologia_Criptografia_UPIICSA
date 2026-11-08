@@ -1,0 +1,65 @@
+// Colores de la app ABCO para el tema claro y el oscuro; Theme.kt los asigna a los roles de Material 3.
+package mx.ipn.upiicsa.prisma.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// Paleta común con la web de ABCO: verde "terminal" sobre grises neutros.
+// Roles: Green = primario, Slate = secundario, Amber = terciario (avisos); los Container* son los niveles
+// de superficie de Material 3, del más bajo al más alto.
+
+// ---- Claro ----
+// Verdes más oscuros para mantener buen contraste sobre fondo blanco.
+val GreenLight = Color(0xFF2E7D1F)
+val GreenContainerLight = Color(0xFFD7F5CC)
+val OnGreenContainerLight = Color(0xFF0C2E05)
+val SlateLight = Color(0xFF4F646C)
+val SlateContainerLight = Color(0xFFD9E4E8)
+val OnSlateContainerLight = Color(0xFF0B1F26)
+val AmberLight = Color(0xFF8A5A00)
+val AmberContainerLight = Color(0xFFFFE2B0)
+val OnAmberContainerLight = Color(0xFF2C1A00)
+val ErrorLight = Color(0xFFB3261E)
+val ErrorContainerLight = Color(0xFFF9DEDC)
+val OnErrorContainerLight = Color(0xFF410E0B)
+val BackgroundLight = Color(0xFFF4F6F7)
+val SurfaceLight = Color(0xFFFFFFFF)
+val OnSurfaceLight = Color(0xFF1D2124)
+val OnSurfaceVariantLight = Color(0xFF55606A)
+val SurfaceVariantLight = Color(0xFFE3E8EB)
+val OutlineLight = Color(0xFF8A959C)
+val OutlineVariantLight = Color(0xFFD3DADE)
+val ContainerLowestLight = Color(0xFFFFFFFF)
+val ContainerLowLight = Color(0xFFF7F9FA)
+val ContainerLight = Color(0xFFF0F3F5)
+val ContainerHighLight = Color(0xFFEAEEF0)
+val ContainerHighestLight = Color(0xFFE3E8EB)
+
+// ---- Oscuro ----
+// Verdes y ámbar más brillantes para leerse sobre grises casi negros.
+val GreenDark = Color(0xFF6BE64A)
+val OnGreenDark = Color(0xFF0B2A04)
+val GreenContainerDark = Color(0xFF1F4A14)
+val OnGreenContainerDark = Color(0xFFCFF8BF)
+val SlateDark = Color(0xFFA9BEC6)
+val OnSlateDark = Color(0xFF1B2A30)
+val SlateContainerDark = Color(0xFF33464D)
+val OnSlateContainerDark = Color(0xFFD9E4E8)
+val AmberDark = Color(0xFFF2B84B)
+val OnAmberDark = Color(0xFF452B00)
+val AmberContainerDark = Color(0xFF5E4100)
+val OnAmberContainerDark = Color(0xFFFFE2B0)
+val ErrorDark = Color(0xFFFF8A80)
+val OnErrorDark = Color(0xFF5C0B07)
+val ErrorContainerDark = Color(0xFF8C1D18)
+val OnErrorContainerDark = Color(0xFFFFDAD6)
+val BackgroundDark = Color(0xFF17191A)
+val OnSurfaceDark = Color(0xFFE8ECEE)
+val OnSurfaceVariantDark = Color(0xFFA7B1B7)
+val SurfaceVariantDark = Color(0xFF33383B)
+val OutlineDark = Color(0xFF6E787E)
+val OutlineVariantDark = Color(0xFF3A4044)
+val ContainerLowestDark = Color(0xFF121415)
+val ContainerLowDark = Color(0xFF1E2123)
+val ContainerDark = Color(0xFF232628)
+val ContainerHighDark = Color(0xFF2B2F31)
+val ContainerHighestDark = Color(0xFF33383B)

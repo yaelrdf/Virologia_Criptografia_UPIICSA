@@ -1,0 +1,13 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="El usuario olvidó su contraseña", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Sesión normal", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  msg [label="Login: «¿Olvidaste tu contraseña?»\n→ «Contacta al administrador»"];
+  adm [label="Admin → Usuarios → Restablecer contraseña"];
+  gen [label="Servidor: contraseña temporal aleatoria (12 caracteres)\nguarda su hash PBKDF2, MustChangePassword = true,\ndesactiva el 2FA (la llave dependía de la contraseña anterior)"];
+  show [label="El admin ve la temporal una sola vez\ny se la entrega al usuario", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  login [label="Login con la temporal → token con marca\n«debe cambiar contraseña»"];
+  q [label="¿Ruta = cambiar\ncontraseña o perfil?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; deny [label="403: cambia tu\ncontraseña primero", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  chg [label="Usuario elige nueva contraseña (≥ 8)\n→ MustChangePassword = false, token nuevo"];
+  ini -> msg -> adm -> gen -> show -> login -> q; q -> deny [label="no"]; q -> chg [label="sí"]; chg -> fin;
+}

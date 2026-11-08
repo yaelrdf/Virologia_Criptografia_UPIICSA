@@ -1,0 +1,12 @@
+digraph G { graph [fontname="DejaVu Sans", fontsize=11, nodesep=0.35, ranksep=0.35, pad=0.2, bgcolor="white"];
+node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", fillcolor="#eef0ff", color="#4b3fd6", penwidth=1.2, margin="0.15,0.07"];
+edge [fontname="DejaVu Sans", fontsize=9, color="#444444", arrowsize=0.7];
+  ini [label="Inicio", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"]; fin [label="Fin", shape=oval, style=filled, fillcolor="#d9f5ee", color="#1d8a6a"];
+  ent [label="Texto P, clave k,\nalfabeto de n letras", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  norm [label="Quitar tildes (á→a)"]; sig [label="Tomar el siguiente carácter x"];
+  q [label="¿x está en\nel alfabeto?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"];
+  pos [label="i = posición de x (A=0 … Z=n−1)"]; cal [label="j = (i + k) mod n"]; sal [label="Agregar alfabeto[j]\n(con la misma mayúscula/minúscula)"];
+  igual [label="Agregar x sin cambio"]; mas [label="¿Quedan\ncaracteres?", shape=diamond, style=filled, fillcolor="#ffe3e8", color="#c4314b", margin="0.05,0.03"]; out [label="Texto cifrado C", shape=parallelogram, style=filled, fillcolor="#fff4d6", color="#b07a00"];
+  ini -> ent -> norm -> sig -> q; q -> pos [label="sí"]; q -> igual [label="no"]; pos -> cal -> sal -> mas; igual -> mas;
+  mas -> sig [label="sí"]; mas -> out [label="no"]; out -> fin;
+}
