@@ -1,0 +1,17 @@
+digraph G { fontname="Arial"; node [fontname="Arial", fontsize=11]; edge [fontname="Arial", fontsize=10];
+  rankdir=TB; nodesep=0.4; ranksep=0.35; node [shape=box, style="rounded,filled", fillcolor="#EEF4FB", color="#0F6CBD"];
+  s [label="Usuario con sesión pulsa\n«Vincular teléfono (QR)»", shape=oval, fillcolor="#DCEAF7"];
+  e [label="POST /api/enroll → código de un solo uso (10 min)\nQR = https://IP:5443/agent.html#enroll=CÓDIGO&fp=HUELLA&tls=CERT"];
+  c [label="¿Quién lo escanea?", shape=diamond, fillcolor="#FFFFFF"];
+  w [label="Cámara del teléfono → navegador\nabre el agente web (sin login)\nacepta una vez el certificado autofirmado"];
+  a [label="App Android → «Escanear QR»\nURL del servidor = origen del enlace\nfija el certificado TLS por SHA-256 (tls)"];
+  k [label="GET /api/server-key\nhuella = SHA-256(llave pública)"];
+  f [label="¿huella = fp del QR?", shape=diamond, fillcolor="#FFFFFF"];
+  x [label="Abortar: posible intermediario\n(no se canjea el código)", fillcolor="#FDECEC", color="#C62828"];
+  p [label="Fijar la llave del servidor"];
+  r [label="POST /api/enroll/redeem {code, name, kind}\n→ token de dispositivo (JWT 30 días)"];
+  u [label="¿código válido y sin usar?", shape=diamond, fillcolor="#FFFFFF"];
+  n [label="401: inválido, usado o expirado", fillcolor="#FDECEC", color="#C62828"];
+  h [label="Handshake ECDH firmado con ECDSA\n→ transmitir los sensores elegidos", shape=oval, fillcolor="#E6F4EA", color="#1A7F37"];
+  s -> e -> c; c -> w [label="web"]; c -> a [label="app"]; w -> k; a -> k; k -> f; f -> x [label="no"]; f -> p [label="sí"]; p -> r -> u; u -> n [label="no"]; u -> h [label="sí"];
+}

@@ -1,0 +1,79 @@
+// Comprobación independiente de reference/test-vectors.json con Web Crypto (Node ≥ 20).
+// Uso: node reference/verify.mjs
+import { readFileSync } from "node:fs";
+import { webcrypto as wc } from "node:crypto";
+import * as ycm1 from "./ycm1.js";
+
+const subtle = wc.subtle;
+const V = JSON.parse(readFileSync(new URL("./test-vectors.json", import.meta.url)));
+// Utilidades mínimas de bytes, sin depender del código del proyecto.
+const hex = (h) => Uint8Array.from(h.match(/../g) ?? [], (b) => parseInt(b, 16));
+const toHex = (u) => Buffer.from(u).toString("hex");
+const b64u = (u) => Buffer.from(u).toString("base64url");
+const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of a) { o.set(x, i); i += x.length; } return o; };
+const utf8 = (s) => new TextEncoder().encode(s);
+const u64 = (n) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, BigInt(n), false); return b; };
+
+let failures = 0;
+/** Compara un valor calculado con el esperado e imprime OK o FAIL. */
+function check(name, got, want) {
+  const ok = got === want;
+  if (!ok) failures++;
+  console.log(`${ok ? "OK  " : "FAIL"} ${name}${ok ? "" : `\n     got  ${got}\n     want ${want}`}`);
+}
+
+/** Convierte un escalar privado y su punto público (hex) en una llave JWK de P-256. */
+function jwk(priv, pub, alg) {
+  const p = hex(pub);
+  return { kty: "EC", crv: "P-256", d: b64u(hex(priv)), x: b64u(p.slice(1, 33)), y: b64u(p.slice(33)), ext: true, ...(alg ? { alg } : {}) };
+}
+
+const hs = V.handshake;
+// ECDH: privada del cliente × pública del servidor debe ser igual a privada del servidor × pública del cliente.
+const cPriv = await subtle.importKey("jwk", jwk(hs.client_ephemeral_private, hs.client_ephemeral_public), { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+const sPub = await subtle.importKey("raw", hex(hs.server_ephemeral_public), { name: "ECDH", namedCurve: "P-256" }, false, []);
+const z = new Uint8Array(await subtle.deriveBits({ name: "ECDH", public: sPub }, cPriv, 256));
+check("ECDH shared_secret_x", toHex(z), hs.shared_secret_x);
+
+// HKDF: cada etiqueta tiene la forma "info(longitud)".
+const salt = cat(hex(hs.client_nonce), hex(hs.server_nonce));
+const ikm = await subtle.importKey("raw", z, "HKDF", false, ["deriveBits"]);
+for (const [label, want] of Object.entries(hs.hkdf.outputs)) {
+  const [, info, len] = label.match(/^(.*)\((\d+)\)$/);
+  const out = new Uint8Array(await subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info: utf8(info) }, ikm, Number(len) * 8));
+  check(`HKDF ${label}`, toHex(out), want);
+}
+
+// Transcript y firma ECDSA del servidor.
+const transcript = cat(utf8("ST1-HS"), hex(hs.client_ephemeral_public), hex(hs.server_ephemeral_public), hex(hs.client_nonce), hex(hs.server_nonce), utf8(hs.device_id), utf8(hs.session_id));
+check("transcript", toHex(transcript), hs.transcript);
+const ltPub = await subtle.importKey("raw", hex(hs.server_longterm_public), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+const sigOk = await subtle.verify({ name: "ECDSA", hash: "SHA-256" }, ltPub, hex(hs.server_signature_p1363_VERIFY_ONLY), transcript);
+check("ECDSA signature verifies", String(sigOk), "true");
+
+// YCM1 del paquete de ejemplo.
+const pk = V.packet;
+const kSig = hex(hs.hkdf.outputs["st1/ycm1(32)"]);
+const { seed, prm } = await ycm1.deriveParams(kSig, pk.seq);
+check("YCM1 params", JSON.stringify({ seed, rounds: prm }), JSON.stringify(pk.ycm1_params));
+const sm = await ycm1.encrypt(hex(pk.plaintext_hex), kSig, pk.seq);
+check("YCM1 output", toHex(sm), pk.ycm1_output);
+check("YCM1 decrypt", toHex(await ycm1.decrypt(sm, kSig, pk.seq)), pk.plaintext_hex);
+
+// AES-256-GCM sobre la salida de YCM1, con su nonce y su AAD.
+const aesKey = await subtle.importKey("raw", hex(pk.aes_gcm.key), "AES-GCM", false, ["encrypt"]);
+const nonce = cat(hex(hs.hkdf.outputs["st1/iv-up(4)"]), u64(pk.seq));
+const aad = cat(utf8("ST1"), utf8(hs.device_id), u64(pk.seq), u64(pk.ts_ms));
+check("AES-GCM nonce", toHex(nonce), pk.aes_gcm["nonce(12)=iv_salt||u64be(seq)"]);
+check("AES-GCM aad", toHex(aad), pk.aes_gcm["aad = 'ST1'||utf8(device_id)||u64be(seq)||u64be(ts)"]);
+const ct = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 }, aesKey, sm));
+check("AES-GCM ciphertext||tag", toHex(ct), pk.aes_gcm.ciphertext_plus_tag);
+
+// PBKDF2-HMAC-SHA256 de las contraseñas.
+const pb = V.pbkdf2;
+const pw = await subtle.importKey("raw", utf8(pb.password), "PBKDF2", false, ["deriveBits"]);
+const dk = new Uint8Array(await subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: hex(pb.salt), iterations: pb.iterations }, pw, pb.dklen * 8));
+check("PBKDF2", toHex(dk), pb.derived);
+
+console.log(failures ? `\n${failures} check(s) failed` : "\nAll vectors verified");
+process.exit(failures ? 1 : 0);

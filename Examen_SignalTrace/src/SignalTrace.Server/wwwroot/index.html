@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Iniciar sesión</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>.login-brand { font-size: 1.4rem; } .login-brand img { width: 64px; height: 64px; }</style>
+</head>
+<body>
+  <main class="center-page">
+    <section class="card login-card" aria-labelledby="t">
+      <div class="row" style="margin-bottom:12px" id="logo"></div>
+      <h1 id="t">Iniciar sesión</h1>
+      <div id="msg" role="alert"></div>
+      <form id="f" autocomplete="on">
+        <div class="field"><label for="u">Usuario</label><input id="u" name="username" autocomplete="username" required></div>
+        <div class="field"><label for="p">Contraseña</label><input id="p" name="password" type="password" autocomplete="current-password" required></div>
+        <button class="primary" type="submit" style="width:100%">Entrar</button>
+      </form>
+    </section>
+  </main>
+  <script type="module">
+    import { api, setAuth, getAuth, esc } from "./js/api.js";
+    import { LOGO, registerServiceWorker } from "./js/ui/shell.js";
+    document.getElementById("logo").innerHTML = `<span class="brand login-brand">${LOGO}<span>SignalTrace</span></span>`;
+    const q = new URLSearchParams(location.search);
+    const next = /^[a-z]+\.html$/.test(q.get("next") || "") ? q.get("next") : "app.html";
+    const msg = document.getElementById("msg");
+    if (q.get("expired")) msg.innerHTML = `<div class="alert-box">Tu sesión expiró. Vuelve a iniciar sesión.</div>`;
+    if (getAuth()) location.replace(next);
+    registerServiceWorker();
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = e.submitter; btn.disabled = true; msg.innerHTML = "";
+      try {
+        const r = await api("/api/auth/login", { method: "POST", body: { username: u.value.trim(), password: p.value } });
+        setAuth(r);
+        location.replace(next);
+      } catch (err) {
+        msg.innerHTML = `<div class="alert-box bad">${esc(err.message)}</div>`;
+      } finally { btn.disabled = false; }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SignalTrace · Usuarios</title>
+  <meta name="theme-color" content="#0f6cbd">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <main>
+    <div class="page-head"><h1>Usuarios y servidor</h1></div>
+    <div class="grid two">
+      <section class="card span-2">
+        <h2>Usuarios</h2>
+        <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>PBKDF2</th><th>Alta</th><th>Acciones</th></tr></thead><tbody id="users"></tbody></table></div>
+        <p class="small muted" style="margin-top:8px">El rol se aplica en el siguiente inicio de sesión del usuario (su JWT actual conserva el rol anterior hasta expirar). Siempre debe quedar al menos un administrador. Tu propia contraseña se cambia desde el menú de usuario, arriba a la derecha.</p>
+      </section>
+      <section class="card">
+        <h2>Nuevo usuario</h2>
+        <form id="f">
+          <div class="field"><label for="u">Usuario</label><input id="u" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\-]+" autocomplete="off"></div>
+          <div class="field"><label for="p">Contraseña (mínimo 8)</label><input id="p" type="password" required minlength="8" autocomplete="new-password"></div>
+          <div class="field"><label for="r">Rol</label><select id="r"><option value="viewer">viewer (ve solo sus dispositivos)</option><option value="admin">admin</option></select></div>
+          <button class="primary" type="submit">Crear</button>
+        </form>
+        <p class="small muted" style="margin-top:10px">La contraseña se guarda como PBKDF2-HMAC-SHA256 con sal aleatoria de 16 B; nunca en claro. El login compara en tiempo constante y espera de forma creciente tras 5 fallos.</p>
+      </section>
+      <section class="card">
+        <h2>Identidad del servidor</h2>
+        <dl class="kv" id="server"></dl>
+      </section>
+      <section class="card">
+        <h2>Historial de paquetes</h2>
+        <div class="table-wrap"><table><thead><tr><th>Estado</th><th>Paquetes</th></tr></thead><tbody id="stats"></tbody></table></div>
+        <p class="small muted" style="margin-top:8px">Se registran también los rechazados (sin texto claro): estado, motivo, tamaño y huella de la IP origen.</p>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="reset-dialog" class="modal" aria-labelledby="reset-title">
+    <h2 id="reset-title">Contraseña restablecida</h2>
+    <p>Nueva contraseña de <b id="reset-user"></b>. Se muestra <b>una sola vez</b>: cópiala y entrégala por un canal seguro.</p>
+    <pre class="mono" id="reset-pw" style="font-size:1.15rem;user-select:all"></pre>
+    <div class="row" style="justify-content:flex-end"><button id="reset-copy">Copiar</button><button class="primary" id="reset-close">Cerrar</button></div>
+  </dialog>
+  <script type="module">
+    import { api, esc, fmtDateTime, toast, getAuth } from "./js/api.js";
+    import { requireAuth, renderShell } from "./js/ui/shell.js";
+    requireAuth({ admin: true });
+    renderShell("admin.html");
+    const me = getAuth().username;
+    async function load() {
+      const users = await api("/api/users");
+      document.getElementById("users").innerHTML = users.map((u) => `<tr><td>${esc(u.username)}${u.username === me ? ' <span class="badge info">tú</span>' : ""}</td>
+        <td><select data-role="${u.id}" aria-label="Rol de ${esc(u.username)}" style="width:auto">
+          ${["viewer", "admin"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+        <td>${u.iterations.toLocaleString("es-MX")} it.</td><td>${fmtDateTime(u.createdAt)}</td>
+        <td class="row" style="flex-wrap:nowrap">${u.username === me ? '<span class="small muted">usa el menú de usuario</span>' : `<button data-reset="${u.id}" data-name="${esc(u.username)}">Restablecer contraseña</button>
+          <button data-del="${u.id}" class="danger">Eliminar</button>`}</td></tr>`).join("");
+      const stats = await api("/api/stats");
+      document.getElementById("stats").innerHTML = stats.packets.map((p) => `<tr><td>${esc(p.status)}</td><td>${p.count}</td></tr>`).join("")
+        + `<tr><td><b>Lecturas guardadas</b></td><td>${stats.readings}</td></tr><tr><td><b>Dispositivos</b></td><td>${stats.devices}</td></tr>`;
+      const key = await api("/api/server-key");
+      const health = await api("/healthz");
+      document.getElementById("server").innerHTML = `<dt>Huella SHA-256</dt><dd class="mono">${key.fingerprint.match(/.{4}/g).join(" ")}</dd>
+        <dt>Llave pública</dt><dd class="mono small">${esc(key.publicKey)}</dd><dt>Suites</dt><dd>${key.suites.join(", ")}</dd>
+        <dt>Sesiones activas</dt><dd>${health.sessions}</dd><dt>API</dt><dd><a href="/scalar" target="_blank" rel="noopener">/scalar</a> · <a href="/openapi/v1.json" target="_blank" rel="noopener">OpenAPI</a></dd>`;
+    }
+    const dlg = document.getElementById("reset-dialog");
+    document.getElementById("reset-close").onclick = () => { document.getElementById("reset-pw").textContent = ""; dlg.close(); };
+    document.getElementById("reset-copy").onclick = async () => {
+      try { await navigator.clipboard.writeText(document.getElementById("reset-pw").textContent); toast("Copiada"); }
+      catch { toast("Selecciónala y cópiala a mano"); }
+    };
+    document.getElementById("users").addEventListener("click", async (e) => {
+      const { del, reset, name } = e.target.dataset;
+      if (del && confirm("¿Eliminar este usuario?")) {
+        try { await api(`/api/users/${del}`, { method: "DELETE" }); load(); } catch (err) { toast(err.message); }
+      }
+      if (reset && confirm(`¿Restablecer la contraseña de ${name}? La actual dejará de funcionar.`)) {
+        try {
+          const r = await api(`/api/users/${reset}/reset-password`, { method: "POST" });
+          document.getElementById("reset-user").textContent = r.username;
+          document.getElementById("reset-pw").textContent = r.password;
+          dlg.showModal();
+        } catch (err) { toast(err.message); }
+      }
+    });
+    document.getElementById("users").addEventListener("change", async (e) => {
+      const id = e.target.dataset.role;
+      if (!id) return;
+      try { await api(`/api/users/${id}/role`, { method: "PUT", body: { role: e.target.value } }); toast("Rol actualizado"); }
+      catch (err) { toast(err.message); }
+      load();
+    });
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api("/api/users", { method: "POST", body: { username: u.value.trim(), password: p.value, role: r.value } });
+        toast("Usuario creado"); e.target.reset(); load();
+      } catch (err) { toast(err.message); }
+    });
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+package mx.ipn.upiicsa.signaltrace
+
+import android.Manifest
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import mx.ipn.upiicsa.signaltrace.telemetry.TelemetryEngine
+import mx.ipn.upiicsa.signaltrace.telemetry.TelemetryService
+import mx.ipn.upiicsa.signaltrace.ui.AppViewModel
+import mx.ipn.upiicsa.signaltrace.ui.SettingsScreen
+import mx.ipn.upiicsa.signaltrace.ui.SetupScreen
+import mx.ipn.upiicsa.signaltrace.ui.StatusScreen
+
+/**
+ * Única actividad de la aplicación. Dibuja con Jetpack Compose tres pestañas (Estado, Configurar y Ajustes),
+ * lanza el lector de QR y pide los permisos antes de iniciar el servicio de telemetría.
+ */
+class MainActivity : ComponentActivity() {
+    /** Estado de la configuración (servidor, huella, registro del dispositivo). */
+    private val vm: AppViewModel by viewModels()
+    /** Nombre del dispositivo escrito antes de abrir el lector de QR. */
+    private var pendingQrName = ""
+
+    // Permisos en tiempo de ejecución: cada permiso negado solo desactiva su sensor; el servicio arranca de todos modos. Sin ubicación.
+    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        TelemetryService.start(this)
+    }
+
+    /** Lector de QR (ZXing); el contenido leído se pasa al ViewModel para vincular el teléfono. */
+    private val scanner = registerForActivityResult(ScanContract()) { result ->
+        result.contents?.let { vm.applyQr(it, pendingQrName) }
+    }
+
+    /** Crea la interfaz: tema claro u oscuro según el sistema, barra inferior de navegación y la pantalla de la pestaña activa. */
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            val scheme = if (isSystemInDarkTheme())
+                darkColorScheme(primary = Color(0xFF4EA1F3), secondary = Color(0xFF1B998B), tertiary = Color(0xFFD29922))
+            else lightColorScheme(primary = Color(0xFF0F6CBD), secondary = Color(0xFF1B998B), tertiary = Color(0xFF9A6700))
+            MaterialTheme(colorScheme = scheme) {
+                // Si todavía no está configurado, abre directamente en la pestaña Configurar.
+                var tab by rememberSaveable { mutableIntStateOf(if (vm.settings.isRegistered && vm.settings.isPinned) 0 else 1) }
+                val engine by TelemetryEngine.state.collectAsStateWithLifecycle()
+                val setup by vm.setup.collectAsStateWithLifecycle()
+                Scaffold(bottomBar = {
+                    NavigationBar {
+                        NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.Home, null) }, label = { Text("Estado") })
+                        NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Build, null) }, label = { Text("Configurar") })
+                        NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.Settings, null) }, label = { Text("Ajustes") })
+                    }
+                }) { inner ->
+                    val m = Modifier.padding(inner)
+                    androidx.compose.foundation.layout.Box(m) {
+                        when (tab) {
+                            0 -> StatusScreen(engine, ready = setup.deviceId != null && setup.pinnedFingerprint != null,
+                                onStart = ::startTelemetry, onStop = { TelemetryService.stop(this@MainActivity) },
+                                onClearQueue = { TelemetryEngine.clearQueue(this@MainActivity) })
+                            1 -> SetupScreen(vm, setup) { name ->
+                                pendingQrName = name
+                                scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Escanea el QR del dashboard").setBeepEnabled(false).setOrientationLocked(false))
+                            }
+                            else -> SettingsScreen(vm.settings, engine.running)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Inicia la telemetría. Solo se llama desde la interfaz visible (Android 12+ prohíbe iniciar servicios en primer
+     * plano desde segundo plano). Pide antes el permiso del podómetro (Android 10+) y el de notificaciones (Android 13+).
+     */
+    private fun startTelemetry() {
+        val wanted = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 29 && vm.settings.source("stp")) wanted += Manifest.permission.ACTIVITY_RECOGNITION
+        if (Build.VERSION.SDK_INT >= 33) wanted += Manifest.permission.POST_NOTIFICATIONS
+        if (wanted.isEmpty()) { TelemetryService.start(this); return }
+        permissions.launch(wanted.toTypedArray())
+    }
+}
