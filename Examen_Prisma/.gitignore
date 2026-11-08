@@ -9,6 +9,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+android/dist/
 android/.idea/
 android/.kotlin/
 *.iml
@@ -25,3 +26,6 @@ android/keystore.properties
 # Python
 __pycache__/
 .venv/
+
+# Node
+node_modules/

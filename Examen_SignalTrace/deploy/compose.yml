@@ -1,0 +1,20 @@
+services:
+  signaltrace:
+    image: signaltrace:latest
+    restart: unless-stopped
+    ports:
+      - "5090:8080"
+      - "5443:5443"
+      - "1883:1883"
+    environment:
+      Admin__Password: "${ADMIN_PASSWORD:-SignalTrace2026!}"
+      Mqtt__Enabled: "false"
+      Https__AdvertiseUrl: "${PUBLIC_URL:-}"
+      Lab__Enabled: "${LAB_ENABLED:-true}"
+      Storage__EncryptAtRest: "${ENCRYPT_AT_REST:-false}"
+      Server__PublicUrl: "${PUBLIC_URL}"
+      Https__Enabled: "false"
+    volumes:
+      - signaltrace-data:/app/data
+volumes:
+  signaltrace-data:

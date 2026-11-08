@@ -55,3 +55,20 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Red de seguridad para todo el repositorio: artefactos, datos locales y secretos
+node_modules/
+__pycache__/
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+**/android/dist/
+**/android/keystore/
+keystore.properties
+local.properties
+*.jks
+*.keystore
+*.db
+*.db-shm
+*.db-wal
+*.pfx
